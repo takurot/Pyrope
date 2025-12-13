@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package pyrope.policy;
+
+service PolicyService {
+  rpc GetIndexPolicy (IndexPolicyRequest) returns (IndexPolicyResponse);
+}
+
+message IndexPolicyRequest {
+  string tenant_id = 1;
+  string index_name = 2;
+  // Optional sample data to help choose parameters
+  // bytes sample_vectors = 3; 
+}
+
+message IndexPolicyResponse {
+  int32 pq_m = 1;
+  int32 pq_construction = 2;
+  int32 pca_dimension = 3;
+  string status = 4;
+}
