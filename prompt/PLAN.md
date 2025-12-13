@@ -22,7 +22,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P0-1** | [Core] | **Project Skeleton & Garnet Hosting**<br>Set up C# solution, integrate `Microsoft.Garnet`, create `GarnetServer` console app. Ensure basic Redis commands work. | - | [ ] |
+| **P0-1** | [Core] | **Project Skeleton & Garnet Hosting**<br>Set up C# solution, integrate `Microsoft.Garnet`, create `GarnetServer` console app. Ensure basic Redis commands work. | - | [x] |
 | **P0-2** | [ML] | **AI Sidecar Skeleton (GRPC)**<br>Create Python project with `grpcio`. Define `.proto` for `PolicyService`. Implement dummy "Echo" policy. | - | [ ] |
 | **P0-3** | [Ops] | **Docker Compose Environment**<br>Containerize P0-1 and P0-2. Configure network. Verify GRPC connectivity from Garnet to Python. | P0-1, P0-2 | [ ] |
 | **P0-4** | [Core] | **Custom Command Registry**<br>Implement `CustomRawStringFunctions` stub for `VEC.ADD`, `VEC.SEARCH`, `VEC.UPSERT`, `VEC.DEL`. Register commands in Garnet. | P0-1 | [ ] |
