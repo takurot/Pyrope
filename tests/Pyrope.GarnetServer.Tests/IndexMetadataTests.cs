@@ -83,7 +83,9 @@ namespace Pyrope.GarnetServer.Tests
             var retrievedValue = db.StringGet(key);
             Assert.True(retrievedValue.HasValue);
 
-            var loadedConfig = _manager.DeserializeConfig((byte[])retrievedValue);
+            var bytes = (byte[]?)retrievedValue;
+            Assert.NotNull(bytes);
+            var loadedConfig = _manager.DeserializeConfig(bytes);
             
             Assert.NotNull(loadedConfig);
             Assert.Equal(768, loadedConfig.Dimension);

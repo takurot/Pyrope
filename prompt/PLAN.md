@@ -209,7 +209,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Tests
 
-- `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj` (warnings in `tests/Pyrope.GarnetServer.Tests/IndexMetadataTests.cs`).
+- `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj`
 
 ---
 
