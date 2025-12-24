@@ -35,7 +35,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P1-1** | [Core] | **FAISS Interop / C# Vector Lib**<br>Integrate FAISS (via C++ interop or C# port) or a lightweight C# vector search lib (for MVP). Define `IVectorIndex` interface supporting cosine/ip/l2. | P0-1 | [ ] |
+| **P1-1** | [Core] | **FAISS Interop / C# Vector Lib**<br>Integrate FAISS (via C++ interop or C# port) or a lightweight C# vector search lib (for MVP). Define `IVectorIndex` interface supporting cosine/ip/l2. | P0-1 | [x] |
 | **P1-2** | [Core] | **Implement `VEC.ADD` & `VEC.UPSERT`**<br>Parse arguments (blob/json). Store vector to `VectorStore` (disk/memory). Update in-memory Index. Support `META <json>`, `tags`, `numeric_fields`. | P1-1, P0-4, P0-5 | [ ] |
 | **P1-3** | [Core] | **Implement `VEC.DEL`**<br>Logical deletion with `deleted: bool` flag. Support epoch/version management for cache invalidation. | P1-2 | [ ] |
 | **P1-4** | [Core] | **Implement `VEC.SEARCH` (Brute Force)**<br>Basic Flat Search implementation. Support `TOPK`, `FILTER` (tag-based). Return RESP array with IDs, Scores, and optional Meta. | P1-2 | [ ] |
@@ -204,9 +204,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
-- Completed P0-3 Docker Compose scaffolding with Garnet + AI sidecar containers.
-- Consolidated IndexConfig model + validation and moved related tests into the main test project.
-- Added KeyUtils and tests for tenant/index metadata keys.
+- Added `IVectorIndex` with L2/IP/Cosine support and a brute-force in-memory implementation.
+- Added unit tests covering search ranking, upsert, delete, and dimension validation.
 
 ## Tests
 
