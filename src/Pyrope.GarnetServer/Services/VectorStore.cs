@@ -37,6 +37,25 @@ namespace Pyrope.GarnetServer.Services
             return _records.TryGetValue(key, out record!);
         }
 
+        public bool TryMarkDeleted(string tenantId, string indexName, string id)
+        {
+            var key = GetRecordKey(tenantId, indexName, id);
+            if (!_records.TryGetValue(key, out var existing))
+            {
+                return false;
+            }
+
+            if (existing.Deleted)
+            {
+                return false;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var updated = existing with { Deleted = true, UpdatedAt = now };
+            _records[key] = updated;
+            return true;
+        }
+
         public void Clear()
         {
             _records.Clear();

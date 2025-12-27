@@ -38,7 +38,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P1-1** | [Core] | **FAISS Interop / C# Vector Lib**<br>Integrate FAISS (via C++ interop or C# port) or a lightweight C# vector search lib (for MVP). Define `IVectorIndex` interface supporting cosine/ip/l2. | P0-1 | [x] |
 | **P1-2** | [Core] | **Implement `VEC.ADD` & `VEC.UPSERT`**<br>Parse arguments (blob/json). Store vector to `VectorStore` (disk/memory). Update in-memory Index. Support `META <json>`, `tags`, `numeric_fields`. | P1-1, P0-4, P0-5 | [x] |
 | **P1-2-1** | [Ops] | **CI/CD Skeleton**<br>Set up CI to run `dotnet test` on PRs. Add lint/format later as needed. | P1-2 | [x] |
-| **P1-3** | [Core] | **Implement `VEC.DEL`**<br>Logical deletion with `deleted: bool` flag. Support epoch/version management for cache invalidation. | P1-2 | [ ] |
+| **P1-3** | [Core] | **Implement `VEC.DEL`**<br>Logical deletion with `deleted: bool` flag. Support epoch/version management for cache invalidation. | P1-2 | [x] |
 | **P1-4** | [Core] | **Implement `VEC.SEARCH` (Brute Force)**<br>Basic Flat Search implementation. Support `TOPK`, `FILTER` (tag-based). Return RESP array with IDs, Scores, and optional Meta. | P1-2 | [ ] |
 | **P1-5** | [Core] | **Error Code System**<br>Implement standardized error codes: `VEC_OK`, `VEC_ERR_DIM`, `VEC_ERR_NOT_FOUND`, `VEC_ERR_QUOTA`, `VEC_ERR_BUSY`. | P1-4 | [ ] |
 | **P1-6** | [Ops] | **Vector Benchmarking Data & Tool**<br>Script to load SIFT1M/Glove datasets. Benchmark baseline latency/QPS of P1-4. | P1-4 | [ ] |
@@ -208,11 +208,13 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented `VEC.ADD`/`VEC.UPSERT` parsing with `VECTOR`, `META`, `TAGS`, and `NUMERIC_FIELDS` handling.
 - Added in-memory `VectorStore` and `VectorIndexRegistry` with vector parsing for JSON/CSV/binary payloads.
 - Updated command registration and tests to reflect the new write path behavior.
+- Implemented `VEC.DEL` with logical deletion, index cleanup, and index epoch tracking.
 - Added GitHub Actions CI to run `dotnet test` on PRs and main pushes.
 
 ## Tests
 
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj`
+- `dotnet test Pyrope.sln`
 
 ---
 

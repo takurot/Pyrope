@@ -20,6 +20,7 @@ namespace Pyrope.GarnetServer.Tests
                  _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
                  
                  _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                 _server.Register.NewCommand("VEC.DEL", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Del), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
                  _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Search), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
                  
                 _server.Start();
@@ -28,6 +29,7 @@ namespace Pyrope.GarnetServer.Tests
                  _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
                  
                  _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                 _server.Register.NewCommand("VEC.DEL", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Del), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
                  _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Search), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
                 _server.Start();
@@ -65,6 +67,23 @@ namespace Pyrope.GarnetServer.Tests
             // For stub, we might return empty array or string, but let's assume it returns something indicative
             // Garnet custom commands usually return custom types, but stub might be simple string for now
             Assert.NotNull(result); 
+        }
+
+        [Fact]
+        public void VecDel_ReturnsOk()
+        {
+            using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
+            var db = redis.GetDatabase();
+
+            var addResult = db.Execute("VEC.ADD", "tenant2", "idx2", "doc2", "VECTOR", "[1,2]");
+            Assert.Equal("OK", addResult.ToString());
+
+            var delResult = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2");
+
+            Assert.Equal("OK", delResult.ToString());
+
+            var secondDelete = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2");
+            Assert.Equal("OK", secondDelete.ToString());
         }
     }
 }

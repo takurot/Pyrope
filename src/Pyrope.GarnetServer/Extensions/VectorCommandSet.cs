@@ -55,6 +55,11 @@ namespace Pyrope.GarnetServer.Extensions
 
             try
             {
+                if (_commandType == VectorCommandType.Del)
+                {
+                    return HandleDelete(key, ref input, ref output);
+                }
+
                 var tenantId = System.Text.Encoding.UTF8.GetString(key);
                 var args = ReadArgs(ref input);
                 var request = VectorCommandParser.Parse(tenantId, args);
@@ -93,6 +98,7 @@ namespace Pyrope.GarnetServer.Extensions
                     return true;
                 }
 
+                IndexRegistry.IncrementEpoch(request.TenantId, request.IndexName);
                 output.WriteSimpleString("OK");
                 return true;
             }
@@ -101,6 +107,41 @@ namespace Pyrope.GarnetServer.Extensions
                 output.WriteError($"ERR {ex.Message}");
                 return true;
             }
+        }
+
+        private bool HandleDelete(ReadOnlySpan<byte> key, ref RawStringInput input, ref RespMemoryWriter output)
+        {
+            var tenantId = System.Text.Encoding.UTF8.GetString(key);
+            var args = ReadArgs(ref input);
+            if (args.Count < 2)
+            {
+                output.WriteError("ERR Expected 2 arguments: index id.");
+                return true;
+            }
+
+            if (args.Count > 2)
+            {
+                output.WriteError("ERR Too many arguments for VEC.DEL.");
+                return true;
+            }
+
+            var indexName = Decode(args[0]);
+            var id = Decode(args[1]);
+
+            var deleted = Store.TryMarkDeleted(tenantId, indexName, id);
+
+            if (IndexRegistry.TryGetIndex(tenantId, indexName, out var index))
+            {
+                index.Delete(id);
+            }
+
+            if (deleted)
+            {
+                IndexRegistry.IncrementEpoch(tenantId, indexName);
+            }
+
+            output.WriteSimpleString("OK");
+            return true;
         }
 
         private static List<ArgSlice> ReadArgs(ref RawStringInput input)
@@ -112,6 +153,11 @@ namespace Pyrope.GarnetServer.Extensions
                 args.Add(input.parseState.GetArgSliceByRef(i));
             }
             return args;
+        }
+
+        private static string Decode(ArgSlice arg)
+        {
+            return System.Text.Encoding.UTF8.GetString(arg.ReadOnlySpan);
         }
     }
 

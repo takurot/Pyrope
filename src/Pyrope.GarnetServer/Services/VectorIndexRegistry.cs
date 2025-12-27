@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using Pyrope.GarnetServer.Vector;
 
 namespace Pyrope.GarnetServer.Services
@@ -29,6 +30,40 @@ namespace Pyrope.GarnetServer.Services
             return state.Index;
         }
 
+        public bool TryGetIndex(string tenantId, string indexName, out IVectorIndex index)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId)) throw new ArgumentException("Tenant id cannot be empty.", nameof(tenantId));
+            if (string.IsNullOrWhiteSpace(indexName)) throw new ArgumentException("Index name cannot be empty.", nameof(indexName));
+
+            var key = GetIndexKey(tenantId, indexName);
+            if (_indices.TryGetValue(key, out var state))
+            {
+                index = state.Index;
+                return true;
+            }
+
+            index = null!;
+            return false;
+        }
+
+        public long IncrementEpoch(string tenantId, string indexName)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId)) throw new ArgumentException("Tenant id cannot be empty.", nameof(tenantId));
+            if (string.IsNullOrWhiteSpace(indexName)) throw new ArgumentException("Index name cannot be empty.", nameof(indexName));
+
+            var key = GetIndexKey(tenantId, indexName);
+            return _indices.TryGetValue(key, out var state) ? state.IncrementEpoch() : 0;
+        }
+
+        public long GetEpoch(string tenantId, string indexName)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId)) throw new ArgumentException("Tenant id cannot be empty.", nameof(tenantId));
+            if (string.IsNullOrWhiteSpace(indexName)) throw new ArgumentException("Index name cannot be empty.", nameof(indexName));
+
+            var key = GetIndexKey(tenantId, indexName);
+            return _indices.TryGetValue(key, out var state) ? state.Epoch : 0;
+        }
+
         public void Clear()
         {
             _indices.Clear();
@@ -38,6 +73,8 @@ namespace Pyrope.GarnetServer.Services
 
         private sealed class IndexState
         {
+            private long _epoch;
+
             public IndexState(int dimension, VectorMetric metric)
             {
                 Dimension = dimension;
@@ -48,6 +85,12 @@ namespace Pyrope.GarnetServer.Services
             public int Dimension { get; }
             public VectorMetric Metric { get; }
             public IVectorIndex Index { get; }
+            public long Epoch => Interlocked.Read(ref _epoch);
+
+            public long IncrementEpoch()
+            {
+                return Interlocked.Increment(ref _epoch);
+            }
         }
     }
 }

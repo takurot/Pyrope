@@ -62,5 +62,28 @@ namespace Pyrope.GarnetServer.Tests.Services
             Assert.Equal("t2", stored.Tags[0]);
             Assert.Equal(2, stored.NumericFields["score"]);
         }
+
+        [Fact]
+        public void TryMarkDeleted_FlagsRecordAsDeleted()
+        {
+            var store = new VectorStore();
+            var record = new VectorRecord(
+                "tenant",
+                "index",
+                "doc1",
+                new[] { 1f, 2f },
+                null,
+                new List<string>(),
+                new Dictionary<string, double>(),
+                default,
+                default);
+
+            store.Upsert(record);
+
+            Assert.True(store.TryMarkDeleted("tenant", "index", "doc1"));
+            Assert.False(store.TryMarkDeleted("tenant", "index", "doc1"));
+            Assert.True(store.TryGet("tenant", "index", "doc1", out var stored));
+            Assert.True(stored.Deleted);
+        }
     }
 }
