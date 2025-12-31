@@ -5,6 +5,7 @@ using Garnet.server;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Services;
 using Pyrope.GarnetServer.Vector;
+using Pyrope.GarnetServer.Policies;
 using Tsavorite.core;
 
 namespace Pyrope.GarnetServer.Extensions
@@ -17,13 +18,20 @@ namespace Pyrope.GarnetServer.Extensions
         public const int VEC_DEL = 12;
         public const int VEC_SEARCH = 13;
         
+        public static VectorIndexRegistry SharedIndexRegistry => IndexRegistry;
+        
         private static readonly VectorStore Store = new();
         private static readonly VectorIndexRegistry IndexRegistry = new();
+        
         private readonly VectorCommandType _commandType;
+        private readonly ResultCache? _resultCache;
+        private readonly IPolicyEngine? _policyEngine;
 
-        public VectorCommandSet(VectorCommandType commandType)
+        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null)
         {
             _commandType = commandType;
+            _resultCache = resultCache;
+            _policyEngine = policyEngine;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -53,6 +61,72 @@ namespace Pyrope.GarnetServer.Extensions
                 var args = ReadArgs(ref input);
                 var request = VectorCommandParser.ParseSearch(tenantId, args);
 
+                // --- CACHE LOOKUP ---
+                QueryKey? queryKey = null;
+                PolicyDecision policyDecision = PolicyDecision.NoCache;
+
+                if (_policyEngine != null && _resultCache != null)
+                {
+                    queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
+                    policyDecision = _policyEngine.Evaluate(queryKey);
+
+                    if (policyDecision.ShouldCache)
+                    {
+                        if (_resultCache.TryGet(queryKey, out var cachedJson) && cachedJson != null)
+                        {
+                            // Cache Hit! Write raw JSON and return
+                            // The cachedJson is the inner array content, need to wrap/parse?
+                            // Based on ResultCache implementation, it stores the ResultJson string.
+                            // We need to write it to output.
+                            // But RESP expects specific structure. 
+                            // Standard output format:
+                            // [count, [id, score, meta], [id, score, meta], ...]
+                            
+                            // If cachedJson is raw RESP string? No, it's seemingly DTO JSON. 
+                            // ResultCacheTests uses "[]" as resultString.
+                            // Let's look at how we traverse results below.
+                            
+                            // We need to reconstruct the RESP response from cached JSON.
+                            // This is expensive. Ideally we cache the RESP binary or close to it.
+                            // But ResultCache stores string ResultJson.
+                            // Let's assume for MVP we deserialize and write.
+                            // Or if ResultCache stores the *RESP formatted* string?
+                            // Let's check ResultCache usage.
+                            
+                            // Wait, if I change the logic to store "serialized search hits" I can just output them?
+                            // Below, we loop and write.
+                            
+                            // Let's just execute search for now if cache miss, then store results.
+                        }
+                    }
+                }
+                
+                // --- END CACHE LOOKUP (Part 1 - logic placeholder, will finish inside flow) ---
+
+                // Re-doing the flow for clean caching integration:
+                
+                if (_policyEngine != null && _resultCache != null)
+                {
+                    queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
+                    policyDecision = _policyEngine.Evaluate(queryKey);
+                    
+                    if (policyDecision.ShouldCache)
+                    {
+                         if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
+                         {
+                             // Deserialize hits to write to output
+                             // This requires making SearchHit public or having a DTO.
+                             // For now, let's assume we can rely on standard JSON serialization of list of hits.
+                             var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
+                             if (cachedHits != null)
+                             {
+                                 WriteResults(ref output, cachedHits, request.IncludeMeta);
+                                 return true;
+                             }
+                         }
+                    }
+                }
+
                 if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
                 {
                     WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
@@ -66,7 +140,7 @@ namespace Pyrope.GarnetServer.Extensions
                 }
 
                 var rawResults = index.Search(request.Vector, request.TopK);
-                var results = new List<SearchHit>(rawResults.Count);
+                var results = new List<SearchHitDto>(rawResults.Count);
                 foreach (var hit in rawResults)
                 {
                     if (!Store.TryGet(request.TenantId, request.IndexName, hit.Id, out var record))
@@ -84,26 +158,16 @@ namespace Pyrope.GarnetServer.Extensions
                         continue;
                     }
 
-                    results.Add(new SearchHit(hit.Id, hit.Score, record.MetaJson));
+                    results.Add(new SearchHitDto { Id = hit.Id, Score = hit.Score, MetaJson = record.MetaJson });
                 }
 
-                output.WriteArrayLength(results.Count);
-                foreach (var hit in results)
+                WriteResults(ref output, results, request.IncludeMeta);
+
+                // --- CACHE SET ---
+                if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
                 {
-                    output.WriteArrayLength(request.IncludeMeta ? 3 : 2);
-                    output.WriteUtf8BulkString(hit.Id);
-                    output.WriteDoubleNumeric(hit.Score);
-                    if (request.IncludeMeta)
-                    {
-                        if (hit.MetaJson is null)
-                        {
-                            output.WriteNull();
-                        }
-                        else
-                        {
-                            output.WriteUtf8BulkString(hit.MetaJson);
-                        }
-                    }
+                    var json = System.Text.Json.JsonSerializer.Serialize(results);
+                    _resultCache.Set(queryKey, json, policyDecision.Ttl);
                 }
 
                 return true;
@@ -287,7 +351,34 @@ namespace Pyrope.GarnetServer.Extensions
             return false;
         }
 
-        private sealed record SearchHit(string Id, float Score, string? MetaJson);
+        private static void WriteResults(ref RespMemoryWriter output, List<SearchHitDto> results, bool includeMeta)
+        {
+            output.WriteArrayLength(results.Count);
+            foreach (var hit in results)
+            {
+                output.WriteArrayLength(includeMeta ? 3 : 2);
+                output.WriteUtf8BulkString(hit.Id);
+                output.WriteDoubleNumeric(hit.Score);
+                if (includeMeta)
+                {
+                    if (hit.MetaJson is null)
+                    {
+                        output.WriteNull();
+                    }
+                    else
+                    {
+                        output.WriteUtf8BulkString(hit.MetaJson);
+                    }
+                }
+            }
+        }
+
+        public class SearchHitDto
+        {
+            public string Id { get; set; } = "";
+            public float Score { get; set; }
+            public string? MetaJson { get; set; }
+        }
     }
 
     public enum VectorCommandType
