@@ -17,6 +17,7 @@ namespace Pyrope.GarnetServer.Extensions
         public const int VEC_UPSERT = 11;
         public const int VEC_DEL = 12;
         public const int VEC_SEARCH = 13;
+        public const int VEC_STATS = 14;
         
         public static VectorIndexRegistry SharedIndexRegistry => IndexRegistry;
         
@@ -26,12 +27,14 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly VectorCommandType _commandType;
         private readonly ResultCache? _resultCache;
         private readonly IPolicyEngine? _policyEngine;
+        private readonly IMetricsCollector? _metrics;
 
-        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null)
+        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
             _policyEngine = policyEngine;
+            _metrics = metrics;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -49,14 +52,28 @@ namespace Pyrope.GarnetServer.Extensions
 
         public override bool Reader(ReadOnlySpan<byte> key, ref RawStringInput input, ReadOnlySpan<byte> value, ref RespMemoryWriter output, ref ReadInfo readInfo)
         {
-            if (_commandType != VectorCommandType.Search)
+            if (_commandType != VectorCommandType.Search && _commandType != VectorCommandType.Stats)
             {
                 WriteErrorCode(ref output, "ERR Unsupported read command.");
                 return true;
             }
 
+            // --- STATS COMMAND ---
+            if (_commandType == VectorCommandType.Stats)
+            {
+                if (_metrics == null)
+                {
+                    output.WriteError("ERR Metrics collector not configured.");
+                    return true;
+                }
+                var stats = _metrics.GetStats();
+                output.WriteUtf8BulkString(stats);
+                return true;
+            }
+
             try
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var tenantId = System.Text.Encoding.UTF8.GetString(key);
                 var args = ReadArgs(ref input);
                 var request = VectorCommandParser.ParseSearch(tenantId, args);
@@ -101,6 +118,7 @@ namespace Pyrope.GarnetServer.Extensions
                     }
                 }
                 
+
                 // --- END CACHE LOOKUP (Part 1 - logic placeholder, will finish inside flow) ---
 
                 // Re-doing the flow for clean caching integration:
@@ -121,8 +139,15 @@ namespace Pyrope.GarnetServer.Extensions
                              if (cachedHits != null)
                              {
                                  WriteResults(ref output, cachedHits, request.IncludeMeta);
+                                 _metrics?.RecordCacheHit();
+                                 sw.Stop();
+                                 _metrics?.RecordSearchLatency(sw.Elapsed);
                                  return true;
                              }
+                         }
+                         else
+                         {
+                             _metrics?.RecordCacheMiss();
                          }
                     }
                 }
@@ -170,6 +195,8 @@ namespace Pyrope.GarnetServer.Extensions
                     _resultCache.Set(queryKey, json, policyDecision.Ttl);
                 }
 
+                sw.Stop();
+                _metrics?.RecordSearchLatency(sw.Elapsed);
                 return true;
             }
             catch (Exception ex)
@@ -386,6 +413,7 @@ namespace Pyrope.GarnetServer.Extensions
         Add,
         Upsert,
         Del,
-        Search
+        Search,
+        Stats
     }
 }

@@ -10,16 +10,18 @@ namespace Pyrope.GarnetServer.Model
     {
         private readonly ICacheStorage _storage;
         private readonly VectorIndexRegistry _indexRegistry;
+        private readonly IMetricsCollector? _metrics;
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
              // For cleaner JSON, maybe optional
              PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
         };
 
-        public ResultCache(ICacheStorage storage, VectorIndexRegistry indexRegistry)
+        public ResultCache(ICacheStorage storage, VectorIndexRegistry indexRegistry, IMetricsCollector? metrics = null)
         {
             _storage = storage;
             _indexRegistry = indexRegistry;
+            _metrics = metrics;
         }
 
         public bool TryGet(QueryKey key, out string? resultJson)
@@ -53,6 +55,7 @@ namespace Pyrope.GarnetServer.Model
                 var currentEpoch = _indexRegistry.GetEpoch(key.TenantId, key.IndexName);
                 if (cachedItemDto.Epoch != currentEpoch)
                 {
+                    _metrics?.RecordEviction("epoch_mismatch");
                     return false;
                 }
 
@@ -62,6 +65,7 @@ namespace Pyrope.GarnetServer.Model
             catch (Exception) // Catch generic JSON/InvalidOperation exceptions
             {
                 // corrupted data
+                _metrics?.RecordEviction("corruption");
                 return false;
             }
         }
