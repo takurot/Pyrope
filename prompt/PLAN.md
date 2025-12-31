@@ -50,7 +50,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P2-1** | [Core] | **QueryKey Generation (Level 0)**<br>Implement `QueryKey` hashing (Exact Match: vector hash + filter + topK + metric). | P1-4 | [ ] |
+| **P2-1** | [Core] | **QueryKey Generation (Level 0)**<br>Implement `QueryKey` hashing (Exact Match: vector hash + filter + topK + metric). | P1-4 | [x] |
 | **P2-2** | [Core] | **Result Cache (L0)**<br>Implement `ResultCache` (QueryKey → topK results). Use Garnet's key-value store. Include `epoch` field for invalidation. | P2-1 | [ ] |
 | **P2-3** | [Core] | **Hot Path Policy Engine**<br>Create `PolicyCheck` hook in `VEC.SEARCH`. Implement static rules (e.g., "Always Cache", "TTL=60s"). Thread-safe atomic swap for policy updates. | P2-2 | [ ] |
 | **P2-4** | [Core] | **Epoch-Based Cache Invalidation**<br>Increment `version_epoch` on index updates. Invalidate cache entries with stale epoch. | P2-2, P1-3 | [ ] |
@@ -213,6 +213,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented `VEC.SEARCH` with brute-force topK search, tag filtering, and optional meta return.
 - Added Garnet command tests for `VEC.SEARCH` result ordering, tag filters, and meta output.
 - Standardized command responses with `VEC_OK` and error codes for dimension mismatch and missing indexes.
+- Implemented `QueryKey` class with custom equality and hashing for vector search caching (P2-1).
 
 ## Tests
 
