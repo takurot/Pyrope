@@ -20,11 +20,15 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton(Pyrope.GarnetServer.Extensions.VectorCommandSet.SharedIndexRegistry);
             builder.Services.AddSingleton<MemoryCacheStorage>();
             builder.Services.AddSingleton<ICacheStorage>(sp => sp.GetRequiredService<MemoryCacheStorage>());
+            builder.Services.AddSingleton<ICacheAdmin>(sp => sp.GetRequiredService<MemoryCacheStorage>());
             builder.Services.AddSingleton<IMetricsCollector, MetricsCollector>();
             builder.Services.AddSingleton(sp => (MetricsCollector)sp.GetRequiredService<IMetricsCollector>()); // Alias if needed
             builder.Services.AddSingleton<LshService>(_ => new LshService());
             builder.Services.AddSingleton<ResultCache>();
-            builder.Services.AddSingleton<IPolicyEngine>(new StaticPolicyEngine(TimeSpan.FromSeconds(60)));
+            builder.Services.AddSingleton<CachePolicyStore>();
+            builder.Services.AddSingleton<DynamicPolicyEngine>();
+            builder.Services.AddSingleton<IPolicyEngine>(sp => sp.GetRequiredService<DynamicPolicyEngine>());
+            builder.Services.AddSingleton<TenantRegistry>();
 
             // Register Args for GarnetService
             builder.Services.AddSingleton(args);

@@ -44,7 +44,9 @@ namespace Pyrope.GarnetServer.Extensions
             int topK,
             float[] vector,
             IReadOnlyList<string> filterTags,
-            bool includeMeta)
+            bool includeMeta,
+            bool trace,
+            string? requestId)
         {
             TenantId = tenantId;
             IndexName = indexName;
@@ -52,6 +54,8 @@ namespace Pyrope.GarnetServer.Extensions
             Vector = vector;
             FilterTags = filterTags;
             IncludeMeta = includeMeta;
+            Trace = trace;
+            RequestId = requestId;
         }
 
         public string TenantId { get; }
@@ -60,6 +64,8 @@ namespace Pyrope.GarnetServer.Extensions
         public float[] Vector { get; }
         public IReadOnlyList<string> FilterTags { get; }
         public bool IncludeMeta { get; }
+        public bool Trace { get; }
+        public string? RequestId { get; }
     }
 
     public static class VectorCommandParser
@@ -230,6 +236,8 @@ namespace Pyrope.GarnetServer.Extensions
             var vector = VectorParsing.ParseVector(args[4].ReadOnlySpan);
             var filterTags = Array.Empty<string>();
             var includeMeta = false;
+            var trace = false;
+            string? requestId = null;
 
             var i = 5;
             while (i < args.Count)
@@ -254,10 +262,29 @@ namespace Pyrope.GarnetServer.Extensions
                     continue;
                 }
 
+                if (token.Equals("TRACE", StringComparison.OrdinalIgnoreCase))
+                {
+                    trace = true;
+                    i++;
+                    continue;
+                }
+
+                if (token.Equals("REQUEST_ID", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        throw new ArgumentException("REQUEST_ID requires a value.");
+                    }
+                    requestId = Decode(args[i]);
+                    i++;
+                    continue;
+                }
+
                 throw new ArgumentException($"Unknown token '{token}'.");
             }
 
-            return new VectorSearchRequest(tenantId, indexName, topK, vector, filterTags, includeMeta);
+            return new VectorSearchRequest(tenantId, indexName, topK, vector, filterTags, includeMeta, trace, requestId);
         }
 
         private static string ValidateJson(string json)
