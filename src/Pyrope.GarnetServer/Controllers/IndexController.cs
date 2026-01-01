@@ -48,6 +48,11 @@ namespace Pyrope.GarnetServer.Controllers
         [HttpPost("{tenantId}/{indexName}/snapshot")]
         public IActionResult SnapshotIndex(string tenantId, string indexName, [FromBody] SnapshotRequest request)
         {
+            if (request == null || string.IsNullOrWhiteSpace(request.Path))
+            {
+                return BadRequest("Path is required.");
+            }
+
             if (_registry.TryGetIndex(tenantId, indexName, out var index))
             {
                 try
@@ -66,22 +71,24 @@ namespace Pyrope.GarnetServer.Controllers
         [HttpPost("{tenantId}/{indexName}/load")]
         public IActionResult LoadIndex(string tenantId, string indexName, [FromBody] SnapshotRequest request)
         {
-             if (_registry.TryGetIndex(tenantId, indexName, out var index))
-             {
-                 try
-                 {
-                     index.Load(request.Path);
-                     return Ok(new { Message = "Index loaded from snapshot." });
-                 }
-                 catch (Exception ex)
-                 {
-                     return StatusCode(500, ex.Message);
-                 }
-             }
-             // If index doesn't exist, we might want to create it? 
-             // For now, assume it must exist (or use Create first).
-             // To load into a new index, user calls Create then Load.
-             return NotFound("Index not found. Please create it first.");
+            if (request == null || string.IsNullOrWhiteSpace(request.Path))
+            {
+                return BadRequest("Path is required.");
+            }
+
+            if (_registry.TryGetIndex(tenantId, indexName, out var index))
+            {
+                try
+                {
+                    index.Load(request.Path);
+                    return Ok(new { Message = "Index loaded from snapshot." });
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, ex.Message);
+                }
+            }
+            return NotFound("Index not found. Please create it first.");
         }
 
         [HttpGet("{tenantId}/{indexName}/stats")]

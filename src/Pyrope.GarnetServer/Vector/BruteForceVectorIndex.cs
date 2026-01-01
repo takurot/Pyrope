@@ -31,10 +31,20 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Snapshot(string path)
         {
-             _lock.EnterReadLock();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Path cannot be empty.", nameof(path));
+            }
+
+            _lock.EnterReadLock();
             try
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(_entries);
+                var dto = new Dictionary<string, VectorEntryDto>(_entries.Count);
+                foreach (var kvp in _entries)
+                {
+                    dto[kvp.Key] = new VectorEntryDto { Vector = kvp.Value.Vector, Norm = kvp.Value.Norm };
+                }
+                var json = System.Text.Json.JsonSerializer.Serialize(dto);
                 System.IO.File.WriteAllText(path, json);
             }
             finally
@@ -45,23 +55,28 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Load(string path)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Path cannot be empty.", nameof(path));
+            }
+
             if (!System.IO.File.Exists(path))
             {
                 throw new System.IO.FileNotFoundException("Snapshot file not found.", path);
             }
 
             var json = System.IO.File.ReadAllText(path);
-            var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, VectorEntry>>(json);
+            var dto = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, VectorEntryDto>>(json);
 
-            if (entries != null)
+            if (dto != null)
             {
                 _lock.EnterWriteLock();
                 try
                 {
                     _entries.Clear();
-                    foreach (var entry in entries)
+                    foreach (var kvp in dto)
                     {
-                        _entries.Add(entry.Key, entry.Value);
+                        _entries.Add(kvp.Key, new VectorEntry(kvp.Value.Vector, kvp.Value.Norm));
                     }
                 }
                 finally
@@ -253,5 +268,12 @@ namespace Pyrope.GarnetServer.Vector
         }
 
         private sealed record VectorEntry(float[] Vector, float Norm);
+
+        // DTO for JSON serialization (VectorEntry is private)
+        private class VectorEntryDto
+        {
+            public float[] Vector { get; set; } = Array.Empty<float>();
+            public float Norm { get; set; }
+        }
     }
 }

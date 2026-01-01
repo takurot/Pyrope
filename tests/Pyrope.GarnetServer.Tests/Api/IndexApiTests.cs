@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pyrope.GarnetServer;
 using Pyrope.GarnetServer.Controllers;
 using Pyrope.GarnetServer.Services;
@@ -23,8 +24,8 @@ namespace Pyrope.GarnetServer.Tests.Api
             {
                 builder.ConfigureServices(services =>
                 {
-                    var descriptor = services.SingleOrDefault(d => d.ImplementationType == typeof(GarnetService));
-                    if (descriptor != null) services.Remove(descriptor);
+                    // Safely remove GarnetService to avoid starting Garnet during tests
+                    services.RemoveAll<Microsoft.Extensions.Hosting.IHostedService>();
                 });
             });
             _client = _factory.CreateClient();
@@ -153,6 +154,56 @@ namespace Pyrope.GarnetServer.Tests.Api
             
             var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/build", null);
             response.EnsureSuccessStatusCode();
+        }
+
+        [Fact]
+        public async Task Snapshot_EmptyPath_ReturnsBadRequest()
+        {
+            var tenantId = "tenant5";
+            var indexName = "index5";
+
+            // Create
+            var createRequest = new CreateIndexRequest
+            {
+                TenantId = tenantId,
+                IndexName = indexName,
+                Dimension = 10,
+                Metric = "L2"
+            };
+            await _client.PostAsync("/v1/indexes", 
+                new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
+
+            // Snapshot with empty path
+            var snapshotReq = new SnapshotRequest { Path = "" };
+            var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/snapshot",
+                 new StringContent(JsonSerializer.Serialize(snapshotReq), Encoding.UTF8, "application/json"));
+            
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Load_EmptyPath_ReturnsBadRequest()
+        {
+            var tenantId = "tenant6";
+            var indexName = "index6";
+
+            // Create
+            var createRequest = new CreateIndexRequest
+            {
+                TenantId = tenantId,
+                IndexName = indexName,
+                Dimension = 10,
+                Metric = "L2"
+            };
+            await _client.PostAsync("/v1/indexes", 
+                new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
+
+            // Load with empty path
+            var loadReq = new SnapshotRequest { Path = "" };
+            var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/load",
+                 new StringContent(JsonSerializer.Serialize(loadReq), Encoding.UTF8, "application/json"));
+            
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
     }
 }
