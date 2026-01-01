@@ -23,6 +23,66 @@ namespace Pyrope.GarnetServer.Vector
 
         public int Dimension { get; }
         public VectorMetric Metric { get; }
+        
+        public void Build()
+        {
+            // No-op for BruteForce
+        }
+
+        public void Snapshot(string path)
+        {
+             _lock.EnterReadLock();
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(_entries);
+                System.IO.File.WriteAllText(path, json);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        public void Load(string path)
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                throw new System.IO.FileNotFoundException("Snapshot file not found.", path);
+            }
+
+            var json = System.IO.File.ReadAllText(path);
+            var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, VectorEntry>>(json);
+
+            if (entries != null)
+            {
+                _lock.EnterWriteLock();
+                try
+                {
+                    _entries.Clear();
+                    foreach (var entry in entries)
+                    {
+                        _entries.Add(entry.Key, entry.Value);
+                    }
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
+        }
+
+        public IndexStats GetStats()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                return new IndexStats(_entries.Count, Dimension, Metric.ToString());
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
 
         public void Add(string id, float[] vector)
         {
