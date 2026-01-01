@@ -7,6 +7,8 @@ services:
       - "3278:3278"
     depends_on:
       - sidecar
+    environment:
+      - PYROPE_SIDECAR_ENDPOINT=http://sidecar:50051
     networks:
       - pyrope-net
 

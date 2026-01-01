@@ -89,6 +89,21 @@ namespace Pyrope.GarnetServer.Services
             return sb.ToString();
         }
 
+        public MetricsSnapshot GetSnapshot()
+        {
+            var buckets = new long[_latencyBuckets.Length];
+            for (int i = 0; i < _latencyBuckets.Length; i++)
+            {
+                buckets[i] = Interlocked.Read(ref _latencyBuckets[i]);
+            }
+
+            return new MetricsSnapshot(
+                Interlocked.Read(ref _cacheHits),
+                Interlocked.Read(ref _cacheMisses),
+                Interlocked.Read(ref _evictions),
+                buckets);
+        }
+
         public void Reset()
         {
             Interlocked.Exchange(ref _cacheHits, 0);
