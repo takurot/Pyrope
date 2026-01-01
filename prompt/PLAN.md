@@ -64,7 +64,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P3-1** | [API] | **Index Management API**<br>`POST /v1/indexes`, `POST /v1/indexes/{id}/build`, `POST /v1/indexes/{id}/snapshot`, `POST /v1/indexes/{id}/load`, `GET /v1/indexes/{id}/stats`. | P1-2 | [ ] |
+| **P3-1** | [API] | **Index Management API**<br>`POST /v1/indexes`, `POST /v1/indexes/{id}/build`, `POST /v1/indexes/{id}/snapshot`, `POST /v1/indexes/{id}/load`, `GET /v1/indexes/{id}/stats`. | P1-2 | [x] |
 | **P3-2** | [API] | **Tenant Management API**<br>`POST /v1/tenants`, `GET /v1/tenants/{id}/quotas`, `PUT /v1/tenants/{id}/quotas`. | P0-5 | [ ] |
 | **P3-3** | [API] | **Cache Management API**<br>`GET /v1/cache/policies`, `PUT /v1/cache/policies`, `POST /v1/cache/flush`, `POST /v1/cache/invalidate`. | P2-3 | [ ] |
 | **P3-4** | [API] | **Health & Metrics API**<br>`GET /v1/health`, `GET /v1/metrics (Prometheus format)`. | P2-5 | [ ] |
@@ -219,6 +219,10 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Integrated `PolicyEngine` and `ResultCache` into `VEC.SEARCH`, enabling cache hits, miss caching, and TTL expiry.
 - Added `MemoryCacheStorage` for in-memory caching during search operations.
 - automated local quality checks with `scripts/check_quality.sh` and updated `prompt/PROMPT.md` guidelines.
+- Implemented **P3-1 Index Management API** using ASP.NET Core hosted within GarnetServer.
+- Refactored `GarnetServer` startup to use `IHostedService` for better testability and lifecycle management.
+- Added `IndexController` with endpoints for create, build, snapshot, load, and stats.
+- Added Integration Tests for Index API using `WebApplicationFactory`.
 
 ## Tests
 

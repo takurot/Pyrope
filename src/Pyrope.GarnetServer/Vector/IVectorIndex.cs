@@ -20,5 +20,13 @@ namespace Pyrope.GarnetServer.Vector
         void Upsert(string id, float[] vector);
         bool Delete(string id);
         IReadOnlyList<SearchResult> Search(float[] query, int topK);
+
+        // Management
+        void Build();
+        void Snapshot(string path);
+        void Load(string path);
+        IndexStats GetStats();
     }
+
+    public record IndexStats(int Count, int Dimension, string Metric);
 }

@@ -23,6 +23,81 @@ namespace Pyrope.GarnetServer.Vector
 
         public int Dimension { get; }
         public VectorMetric Metric { get; }
+        
+        public void Build()
+        {
+            // No-op for BruteForce
+        }
+
+        public void Snapshot(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Path cannot be empty.", nameof(path));
+            }
+
+            _lock.EnterReadLock();
+            try
+            {
+                var dto = new Dictionary<string, VectorEntryDto>(_entries.Count);
+                foreach (var kvp in _entries)
+                {
+                    dto[kvp.Key] = new VectorEntryDto { Vector = kvp.Value.Vector, Norm = kvp.Value.Norm };
+                }
+                var json = System.Text.Json.JsonSerializer.Serialize(dto);
+                System.IO.File.WriteAllText(path, json);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        public void Load(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Path cannot be empty.", nameof(path));
+            }
+
+            if (!System.IO.File.Exists(path))
+            {
+                throw new System.IO.FileNotFoundException("Snapshot file not found.", path);
+            }
+
+            var json = System.IO.File.ReadAllText(path);
+            var dto = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, VectorEntryDto>>(json);
+
+            if (dto != null)
+            {
+                _lock.EnterWriteLock();
+                try
+                {
+                    _entries.Clear();
+                    foreach (var kvp in dto)
+                    {
+                        _entries.Add(kvp.Key, new VectorEntry(kvp.Value.Vector, kvp.Value.Norm));
+                    }
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
+        }
+
+        public IndexStats GetStats()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                return new IndexStats(_entries.Count, Dimension, Metric.ToString());
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
 
         public void Add(string id, float[] vector)
         {
@@ -193,5 +268,12 @@ namespace Pyrope.GarnetServer.Vector
         }
 
         private sealed record VectorEntry(float[] Vector, float Norm);
+
+        // DTO for JSON serialization (VectorEntry is private)
+        private class VectorEntryDto
+        {
+            public float[] Vector { get; set; } = Array.Empty<float>();
+            public float Norm { get; set; }
+        }
     }
 }
