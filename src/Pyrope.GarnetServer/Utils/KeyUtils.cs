@@ -11,5 +11,10 @@ namespace Pyrope.GarnetServer.Utils
         {
             return $"_meta:tenant:{tenantId}:config";
         }
+
+        public static string GetCacheKeyPrefix(string tenantId, string indexName)
+        {
+            return $"cache:{tenantId}:{indexName}:";
+        }
     }
 }

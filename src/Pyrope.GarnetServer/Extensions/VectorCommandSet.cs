@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text.Json;
 using Garnet.common;
 using Garnet.server;
 using Pyrope.GarnetServer.Model;
@@ -75,33 +77,62 @@ namespace Pyrope.GarnetServer.Extensions
 
             try
             {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var totalStart = Stopwatch.GetTimestamp();
                 var tenantId = System.Text.Encoding.UTF8.GetString(key);
                 var args = ReadArgs(ref input);
                 var request = VectorCommandParser.ParseSearch(tenantId, args);
+                var traceEnabled = request.Trace;
+                var requestId = request.RequestId;
+                if (traceEnabled && string.IsNullOrWhiteSpace(requestId))
+                {
+                    requestId = Guid.NewGuid().ToString("N");
+                }
 
 
                 // --- CACHE LOOKUP ---
                 QueryKey? queryKey = null;
                 PolicyDecision policyDecision = PolicyDecision.NoCache;
+                long policyStart = 0;
+                long policyEnd = 0;
+                long cacheStart = 0;
+                long cacheEnd = 0;
+                long faissStart = 0;
+                long faissEnd = 0;
+                var cacheHit = false;
 
                 if (_policyEngine != null && _resultCache != null)
                 {
+                    policyStart = Stopwatch.GetTimestamp();
                     queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
                     policyDecision = _policyEngine.Evaluate(queryKey);
+                    policyEnd = Stopwatch.GetTimestamp();
 
                     if (policyDecision.ShouldCache)
                     {
+                        cacheStart = Stopwatch.GetTimestamp();
                         // 1. Try L0 (Precise/Exact)
                         if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
                         {
                             var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
                             if (cachedHits != null)
                             {
-                                WriteResults(ref output, cachedHits, request.IncludeMeta);
+                                cacheHit = true;
+                                cacheEnd = Stopwatch.GetTimestamp();
+                                var totalEnd = Stopwatch.GetTimestamp();
+                                var traceJson = traceEnabled
+                                    ? JsonSerializer.Serialize(new TraceInfo
+                                    {
+                                        RequestId = requestId,
+                                        CacheHit = true,
+                                        LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
+                                        PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                                        CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                                        FaissMs = 0
+                                    })
+                                    : null;
+                                WriteResults(ref output, cachedHits, request.IncludeMeta, traceJson);
                                 _metrics?.RecordCacheHit();
-                                sw.Stop();
-                                _metrics?.RecordSearchLatency(sw.Elapsed);
+                                _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
                                 return true;
                             }
                         }
@@ -119,10 +150,23 @@ namespace Pyrope.GarnetServer.Extensions
                                     var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
                                     if (l1Hits != null)
                                     {
-                                        WriteResults(ref output, l1Hits, request.IncludeMeta);
+                                        cacheHit = true;
+                                        cacheEnd = Stopwatch.GetTimestamp();
+                                        var totalEnd = Stopwatch.GetTimestamp();
+                                        var traceJson = traceEnabled
+                                            ? JsonSerializer.Serialize(new TraceInfo
+                                            {
+                                                RequestId = requestId,
+                                                CacheHit = true,
+                                                LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
+                                                PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                                                CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                                                FaissMs = 0
+                                            })
+                                            : null;
+                                        WriteResults(ref output, l1Hits, request.IncludeMeta, traceJson);
                                         _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
-                                        sw.Stop();
-                                        _metrics?.RecordSearchLatency(sw.Elapsed);
+                                        _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
                                         return true;
                                     }
                                 }
@@ -130,6 +174,7 @@ namespace Pyrope.GarnetServer.Extensions
                             }
 
                             // If we reached here, both L0 and L1 (if enabled) missed
+                            cacheEnd = Stopwatch.GetTimestamp();
                             _metrics?.RecordCacheMiss();
                         }
                     }
@@ -147,7 +192,9 @@ namespace Pyrope.GarnetServer.Extensions
                     return true;
                 }
 
+                faissStart = Stopwatch.GetTimestamp();
                 var rawResults = index.Search(request.Vector, request.TopK);
+                faissEnd = Stopwatch.GetTimestamp();
                 var results = new List<SearchHitDto>(rawResults.Count);
                 foreach (var hit in rawResults)
                 {
@@ -169,7 +216,19 @@ namespace Pyrope.GarnetServer.Extensions
                     results.Add(new SearchHitDto { Id = hit.Id, Score = hit.Score, MetaJson = record.MetaJson });
                 }
 
-                WriteResults(ref output, results, request.IncludeMeta);
+                var totalFinish = Stopwatch.GetTimestamp();
+                var tracePayload = traceEnabled
+                    ? JsonSerializer.Serialize(new TraceInfo
+                    {
+                        RequestId = requestId,
+                        CacheHit = cacheHit,
+                        LatencyMs = ElapsedMilliseconds(totalStart, totalFinish),
+                        PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                        CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                        FaissMs = ElapsedMilliseconds(faissStart, faissEnd)
+                    })
+                    : null;
+                WriteResults(ref output, results, request.IncludeMeta, tracePayload);
 
                 // --- CACHE SET ---
                 if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
@@ -189,8 +248,7 @@ namespace Pyrope.GarnetServer.Extensions
                     }
                 }
 
-                sw.Stop();
-                _metrics?.RecordSearchLatency(sw.Elapsed);
+                _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalFinish)));
                 return true;
             }
             catch (Exception ex)
@@ -372,7 +430,20 @@ namespace Pyrope.GarnetServer.Extensions
             return false;
         }
 
-        private static void WriteResults(ref RespMemoryWriter output, List<SearchHitDto> results, bool includeMeta)
+        private static void WriteResults(ref RespMemoryWriter output, List<SearchHitDto> results, bool includeMeta, string? traceJson)
+        {
+            if (traceJson is null)
+            {
+                WriteHits(ref output, results, includeMeta);
+                return;
+            }
+
+            output.WriteArrayLength(2);
+            WriteHits(ref output, results, includeMeta);
+            output.WriteUtf8BulkString(traceJson);
+        }
+
+        private static void WriteHits(ref RespMemoryWriter output, List<SearchHitDto> results, bool includeMeta)
         {
             output.WriteArrayLength(results.Count);
             foreach (var hit in results)
@@ -394,11 +465,31 @@ namespace Pyrope.GarnetServer.Extensions
             }
         }
 
+        private static double ElapsedMilliseconds(long start, long end)
+        {
+            if (start == 0 || end == 0 || end <= start)
+            {
+                return 0;
+            }
+
+            return (end - start) * 1000d / Stopwatch.Frequency;
+        }
+
         public class SearchHitDto
         {
             public string Id { get; set; } = "";
             public float Score { get; set; }
             public string? MetaJson { get; set; }
+        }
+
+        private class TraceInfo
+        {
+            public string? RequestId { get; set; }
+            public bool CacheHit { get; set; }
+            public double LatencyMs { get; set; }
+            public double PolicyMs { get; set; }
+            public double CacheMs { get; set; }
+            public double FaissMs { get; set; }
         }
     }
 
