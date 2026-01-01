@@ -15,7 +15,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         {
             var port = 3278 + new Random().Next(1000); // Random port to avoid collision
             _server = new Garnet.GarnetServer(new string[] { "--port", port.ToString(), "--bind", "127.0.0.1" });
-            
+
             // Manual registration to include LSH
             var indexRegistry = new Pyrope.GarnetServer.Services.VectorIndexRegistry();
             var cacheStorage = new Pyrope.GarnetServer.Model.MemoryCacheStorage();
@@ -48,13 +48,13 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var index = "idx_sem";
             var id = "item1";
             var vector = new float[4] { 1, 0, 0, 0 }; // 4 dims
-            
+
             // Syntax: VEC.ADD tenant index id VECTOR [1,0,0,0]
             _db.Execute("VEC.ADD", tenant, index, id, "VECTOR", JsonSerializer.Serialize(vector));
 
             // 2. Search Original (L0 Miss -> Populates L0 & L1)
             // Query: [1, 0, 0, 0] -> Exact match to data
-            var q1 = new float[4] { 1, 0, 0, 0 }; 
+            var q1 = new float[4] { 1, 0, 0, 0 };
             // Syntax: VEC.SEARCH tenant index TOPK 5 VECTOR [...]
             _db.Execute("VEC.SEARCH", tenant, index, "TOPK", "5", "VECTOR", JsonSerializer.Serialize(q1));
 
@@ -68,7 +68,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
             // 3. Search Similar (SimHash match expected)
             // Query: [2, 0, 0, 0] -> Same angle as [1, 0, 0, 0] (SimHash identical), but L0 Miss.
-            var q2 = new float[4] { 2, 0, 0, 0 }; 
+            var q2 = new float[4] { 2, 0, 0, 0 };
             _db.Execute("VEC.SEARCH", tenant, index, "TOPK", "5", "VECTOR", JsonSerializer.Serialize(q2));
 
             // Check Stats: 1 Hit (L1)

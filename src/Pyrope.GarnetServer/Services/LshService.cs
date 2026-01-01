@@ -6,7 +6,7 @@ namespace Pyrope.GarnetServer.Services
     {
         private readonly int _seed;
         private readonly int _hashBits;
-        
+
         // Cache projections per dimension: <dimension, projections>
         private readonly Dictionary<int, float[][]> _projectionCache = new();
         private readonly object _lock = new();
@@ -29,7 +29,7 @@ namespace Pyrope.GarnetServer.Services
 
                 // Create deterministic RNG for this dimension
                 // Using seed + dimension ensuring independent streams per dim
-                var rng = new Random(_seed + dimensions); 
+                var rng = new Random(_seed + dimensions);
                 var projections = new float[_hashBits][];
 
                 for (int i = 0; i < _hashBits; i++)

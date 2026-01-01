@@ -13,8 +13,8 @@ namespace Pyrope.GarnetServer.Model
         private readonly IMetricsCollector? _metrics;
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-             // For cleaner JSON, maybe optional
-             PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+            // For cleaner JSON, maybe optional
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
         public ResultCache(ICacheStorage storage, VectorIndexRegistry indexRegistry, IMetricsCollector? metrics = null)
@@ -37,7 +37,7 @@ namespace Pyrope.GarnetServer.Model
                 return false;
             }
 
-            try 
+            try
             {
                 // 3. Deserialize to DTO
                 var cachedItemDto = JsonSerializer.Deserialize<CachedItemDto>(data, _jsonOptions);
@@ -82,7 +82,7 @@ namespace Pyrope.GarnetServer.Model
 
             var data = JsonSerializer.SerializeToUtf8Bytes(itemDto, _jsonOptions);
             var storageKey = GetStorageKey(key);
-            
+
             _storage.Set(storageKey, data, ttl);
         }
 

@@ -18,7 +18,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         public VectorStatsTests()
         {
             _port = 5000 + new Random().Next(1000);
-            
+
             // Shared components
             var metrics = new MetricsCollector();
             var indexRegistry = VectorCommandSet.SharedIndexRegistry;
@@ -27,17 +27,20 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var policyEngine = new StaticPolicyEngine(TimeSpan.FromSeconds(60));
 
 
-            try {
-                 _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
-                 
-                 _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-                 _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, metrics), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
-                 _server.Register.NewCommand("VEC.STATS", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, metrics), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });
-                 
-                 _server.Start();
-            } catch {
-                 // Retry logic omitted for brevity in test, assumption is low conflict risk
-                 throw;
+            try
+            {
+                _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
+
+                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, metrics), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                _server.Register.NewCommand("VEC.STATS", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, metrics), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });
+
+                _server.Start();
+            }
+            catch
+            {
+                // Retry logic omitted for brevity in test, assumption is low conflict risk
+                throw;
             }
         }
 
@@ -69,7 +72,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
             // 3. Perform Search (Hit)
             db.Execute("VEC.SEARCH", "t_stats", "i_stats", "TOPK", "1", "VECTOR", "[1,0]");
-            
+
             var hitStats = (string?)db.Execute("VEC.STATS", "sys:dummy");
             Assert.Contains("cache_miss_total 1", hitStats);
             Assert.Contains("cache_hit_total 1", hitStats);

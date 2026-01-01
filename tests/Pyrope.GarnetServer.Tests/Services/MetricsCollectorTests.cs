@@ -10,14 +10,14 @@ namespace Pyrope.GarnetServer.Tests.Services
         public void RecordAndGetStats_ShouldReturnCorrectCounts()
         {
             var collector = new MetricsCollector();
-            
+
             collector.RecordCacheHit();
             collector.RecordCacheHit();
             collector.RecordCacheMiss();
             collector.RecordEviction("ttl");
 
             var stats = collector.GetStats();
-            
+
             Assert.Contains("cache_hit_total 2", stats);
             Assert.Contains("cache_miss_total 1", stats);
             Assert.Contains("cache_eviction_total 1", stats);
@@ -27,7 +27,7 @@ namespace Pyrope.GarnetServer.Tests.Services
         public void RecordLatency_ShouldBucketCorrectly()
         {
             var collector = new MetricsCollector();
-            
+
             collector.RecordSearchLatency(TimeSpan.FromMilliseconds(0.5)); // < 1
             collector.RecordSearchLatency(TimeSpan.FromMilliseconds(4));   // < 5
             collector.RecordSearchLatency(TimeSpan.FromMilliseconds(150)); // > 100
@@ -45,9 +45,9 @@ namespace Pyrope.GarnetServer.Tests.Services
         {
             var collector = new MetricsCollector();
             collector.RecordCacheHit();
-            
+
             collector.Reset();
-            
+
             var stats = collector.GetStats();
             Assert.Contains("cache_hit_total 0", stats);
         }

@@ -24,7 +24,7 @@ namespace Pyrope.GarnetServer.Tests.Services
         public void GenerateSimHash_ShouldHaveLocalityProperty()
         {
             var service = new LshService(seed: 123, hashBits: 64);
-            
+
             // v1 and v2 are very similar (angle is small)
             var v1 = new float[] { 1f, 0.9f, 0f, 0f };
             var v2 = new float[] { 1f, 0.95f, 0.01f, 0f };

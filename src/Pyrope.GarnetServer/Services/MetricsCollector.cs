@@ -9,7 +9,7 @@ namespace Pyrope.GarnetServer.Services
         private long _cacheHits;
         private long _cacheMisses;
         private long _evictions;
-        
+
         // Simple latency buckets (count)
         // <1ms, <5ms, <10ms, <50ms, <100ms, >100ms
         private readonly long[] _latencyBuckets = new long[6];
@@ -51,7 +51,7 @@ namespace Pyrope.GarnetServer.Services
             sb.AppendLine($"# HELP cache_hit_total Total number of cache hits");
             sb.AppendLine($"# TYPE cache_hit_total counter");
             sb.AppendLine($"cache_hit_total {Interlocked.Read(ref _cacheHits)}");
-            
+
             sb.AppendLine($"# HELP cache_miss_total Total number of cache misses");
             sb.AppendLine($"# TYPE cache_miss_total counter");
             sb.AppendLine($"cache_miss_total {Interlocked.Read(ref _cacheMisses)}");
@@ -64,28 +64,28 @@ namespace Pyrope.GarnetServer.Services
             sb.AppendLine($"# TYPE vector_search_latency_ms histogram");
 
             long count = 0;
-            
+
             count += Interlocked.Read(ref _latencyBuckets[0]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"1\"}} {count}");
-            
+
             count += Interlocked.Read(ref _latencyBuckets[1]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"5\"}} {count}");
-            
+
             count += Interlocked.Read(ref _latencyBuckets[2]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"10\"}} {count}");
-            
+
             count += Interlocked.Read(ref _latencyBuckets[3]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"50\"}} {count}");
-            
+
             count += Interlocked.Read(ref _latencyBuckets[4]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"100\"}} {count}");
-            
+
             count += Interlocked.Read(ref _latencyBuckets[5]);
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"+Inf\"}} {count}");
-            
+
             sb.AppendLine($"vector_search_latency_ms_count {count}");
             sb.AppendLine($"vector_search_latency_ms_sum 0"); // Sum not implemented yet
-            
+
             return sb.ToString();
         }
 

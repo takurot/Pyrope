@@ -7,7 +7,7 @@ namespace Pyrope.GarnetServer.Policies
     {
         public bool ShouldCache { get; init; }
         public TimeSpan? Ttl { get; init; }
-        
+
         public static readonly PolicyDecision NoCache = new() { ShouldCache = false };
         public static PolicyDecision Cache(TimeSpan ttl) => new() { ShouldCache = true, Ttl = ttl };
     }

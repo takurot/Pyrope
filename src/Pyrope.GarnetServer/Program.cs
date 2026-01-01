@@ -15,7 +15,7 @@ namespace Pyrope.GarnetServer
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddControllers();
-            
+
             // Register Core Services
             builder.Services.AddSingleton(Pyrope.GarnetServer.Extensions.VectorCommandSet.SharedIndexRegistry);
             builder.Services.AddSingleton<MemoryCacheStorage>();
@@ -25,13 +25,13 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<LshService>(_ => new LshService());
             builder.Services.AddSingleton<ResultCache>();
             builder.Services.AddSingleton<IPolicyEngine>(new StaticPolicyEngine(TimeSpan.FromSeconds(60)));
-            
+
             // Register Args for GarnetService
             builder.Services.AddSingleton(args);
 
             // Register GarnetService as Hosted Service
             builder.Services.AddHostedService<GarnetService>();
-            
+
             var app = builder.Build();
             app.MapControllers();
 

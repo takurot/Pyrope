@@ -31,7 +31,7 @@ namespace Pyrope.GarnetServer.Model
             TopK = topK;
             Metric = metric;
             SimHash = simHash;
-            
+
             // Normalize tags: Case-sensitive, sorted/set for uniqueness and order-independence in equality
             if (filterTags == null || filterTags.Count == 0)
             {
@@ -39,7 +39,7 @@ namespace Pyrope.GarnetServer.Model
             }
             else
             {
-                 FilterTags = new HashSet<string>(filterTags);
+                FilterTags = new HashSet<string>(filterTags);
             }
         }
 
@@ -73,7 +73,7 @@ namespace Pyrope.GarnetServer.Model
                 // L1: Compare SimHash
                 return SimHash.Value == other.SimHash.Value;
             }
-            
+
             // L0: Check vector (Exact match)
             if (SimHash.HasValue != other.SimHash.HasValue) return false; // Mixing types?
 

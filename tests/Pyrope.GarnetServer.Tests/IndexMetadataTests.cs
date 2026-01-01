@@ -75,7 +75,7 @@ namespace Pyrope.GarnetServer.Tests
             };
 
             var jsonBytes = _manager.SerializeConfig(config);
-            
+
             // Store in Garnet
             db.StringSet(key, jsonBytes);
 
@@ -86,12 +86,12 @@ namespace Pyrope.GarnetServer.Tests
             var bytes = (byte[]?)retrievedValue;
             Assert.NotNull(bytes);
             var loadedConfig = _manager.DeserializeConfig(bytes);
-            
+
             Assert.NotNull(loadedConfig);
             Assert.Equal(768, loadedConfig.Dimension);
             Assert.Equal("IP", loadedConfig.Metric);
         }
-        
+
         [Fact]
         public void GetMetadataKey_ValidatesInputs()
         {

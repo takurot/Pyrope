@@ -42,13 +42,13 @@ namespace Pyrope.GarnetServer.Tests.Api
                 Metric = "L2"
             };
 
-            var response = await _client.PostAsync("/v1/indexes", 
+            var response = await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json"));
 
             if (!response.IsSuccessStatusCode)
             {
-                 var err = await response.Content.ReadAsStringAsync();
-                 throw new Exception($"API Failed: {response.StatusCode} {err}");
+                var err = await response.Content.ReadAsStringAsync();
+                throw new Exception($"API Failed: {response.StatusCode} {err}");
             }
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         }
@@ -56,14 +56,14 @@ namespace Pyrope.GarnetServer.Tests.Api
         [Fact]
         public async Task CreateIndex_InvalidRequest_ReturnsBadRequest()
         {
-             var request = new CreateIndexRequest
+            var request = new CreateIndexRequest
             {
                 TenantId = "", // Invalid
                 IndexName = "index1",
                 Dimension = 128
             };
 
-            var response = await _client.PostAsync("/v1/indexes", 
+            var response = await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json"));
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -74,7 +74,7 @@ namespace Pyrope.GarnetServer.Tests.Api
         {
             var tenantId = "tenant2";
             var indexName = "index2";
-            
+
             // Create first
             var createRequest = new CreateIndexRequest
             {
@@ -83,20 +83,20 @@ namespace Pyrope.GarnetServer.Tests.Api
                 Dimension = 64,
                 Metric = "Cosine"
             };
-            await _client.PostAsync("/v1/indexes", 
+            await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
 
             // Get Stats
             var response = await _client.GetAsync($"/v1/indexes/{tenantId}/{indexName}/stats");
-            
+
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync();
-            var stats = JsonSerializer.Deserialize<IndexStats>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true});
+            var stats = JsonSerializer.Deserialize<IndexStats>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             Assert.NotNull(stats);
             Assert.Equal(64, stats.Dimension);
             Assert.Equal("Cosine", stats.Metric);
-            Assert.Equal(0, stats.Count); 
+            Assert.Equal(0, stats.Count);
         }
 
         [Fact]
@@ -107,21 +107,21 @@ namespace Pyrope.GarnetServer.Tests.Api
             var snapshotPath = Path.Combine(Path.GetTempPath(), $"snapshot_{Guid.NewGuid()}.json");
 
             // Create
-             var createRequest = new CreateIndexRequest
+            var createRequest = new CreateIndexRequest
             {
                 TenantId = tenantId,
                 IndexName = indexName,
                 Dimension = 10,
                 Metric = "L2"
             };
-            await _client.PostAsync("/v1/indexes", 
+            await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
 
             // Snapshot
             var snapshotReq = new SnapshotRequest { Path = snapshotPath };
             var snapResponse = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/snapshot",
                  new StringContent(JsonSerializer.Serialize(snapshotReq), Encoding.UTF8, "application/json"));
-            
+
             snapResponse.EnsureSuccessStatusCode();
             Assert.True(File.Exists(snapshotPath));
 
@@ -129,29 +129,29 @@ namespace Pyrope.GarnetServer.Tests.Api
             var loadReq = new SnapshotRequest { Path = snapshotPath };
             var loadResponse = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/load",
                  new StringContent(JsonSerializer.Serialize(loadReq), Encoding.UTF8, "application/json"));
-            
+
             loadResponse.EnsureSuccessStatusCode();
 
             // Cleanup
             if (File.Exists(snapshotPath)) File.Delete(snapshotPath);
         }
-        
+
         [Fact]
         public async Task Build_ReturnsOk()
         {
             var tenantId = "tenant4";
             var indexName = "index4";
-             // Create
-             var createRequest = new CreateIndexRequest
+            // Create
+            var createRequest = new CreateIndexRequest
             {
                 TenantId = tenantId,
                 IndexName = indexName,
                 Dimension = 10,
                 Metric = "L2"
             };
-            await _client.PostAsync("/v1/indexes", 
+            await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
-            
+
             var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/build", null);
             response.EnsureSuccessStatusCode();
         }
@@ -170,14 +170,14 @@ namespace Pyrope.GarnetServer.Tests.Api
                 Dimension = 10,
                 Metric = "L2"
             };
-            await _client.PostAsync("/v1/indexes", 
+            await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
 
             // Snapshot with empty path
             var snapshotReq = new SnapshotRequest { Path = "" };
             var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/snapshot",
                  new StringContent(JsonSerializer.Serialize(snapshotReq), Encoding.UTF8, "application/json"));
-            
+
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
@@ -195,14 +195,14 @@ namespace Pyrope.GarnetServer.Tests.Api
                 Dimension = 10,
                 Metric = "L2"
             };
-            await _client.PostAsync("/v1/indexes", 
+            await _client.PostAsync("/v1/indexes",
                 new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
 
             // Load with empty path
             var loadReq = new SnapshotRequest { Path = "" };
             var response = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/load",
                  new StringContent(JsonSerializer.Serialize(loadReq), Encoding.UTF8, "application/json"));
-            
+
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
     }

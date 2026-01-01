@@ -44,12 +44,12 @@ namespace Pyrope.GarnetServer.Tests.Model
             var storage = new MockCacheStorage();
             var registry = new VectorIndexRegistry();
             var cache = new ResultCache(storage, registry);
-            
+
             var key = CreateKey("t1", "idx1");
             var result = "[]";
-            
+
             cache.Set(key, result);
-            
+
             Assert.True(cache.TryGet(key, out var cachedResult));
             Assert.Equal(result, cachedResult);
         }
@@ -60,9 +60,9 @@ namespace Pyrope.GarnetServer.Tests.Model
             var storage = new MockCacheStorage();
             var registry = new VectorIndexRegistry();
             var cache = new ResultCache(storage, registry);
-            
+
             var key = CreateKey("t1", "idx1");
-            
+
             Assert.False(cache.TryGet(key, out _));
         }
 
@@ -71,19 +71,19 @@ namespace Pyrope.GarnetServer.Tests.Model
         {
             var storage = new MockCacheStorage();
             var registry = new VectorIndexRegistry();
-            
+
             // Initialize index and get initial epoch (1)
             registry.GetOrCreate("t1", "idx1", 128, VectorMetric.L2);
-            
+
             var cache = new ResultCache(storage, registry);
             var key = CreateKey("t1", "idx1");
-            
+
             // Cache at current epoch
             cache.Set(key, "[]");
-            
+
             // Increment epoch (simulate update/delete)
             registry.IncrementEpoch("t1", "idx1");
-            
+
             // Should be invalid
             Assert.False(cache.TryGet(key, out _));
         }

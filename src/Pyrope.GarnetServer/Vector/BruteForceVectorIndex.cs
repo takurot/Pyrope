@@ -23,7 +23,7 @@ namespace Pyrope.GarnetServer.Vector
 
         public int Dimension { get; }
         public VectorMetric Metric { get; }
-        
+
         public void Build()
         {
             // No-op for BruteForce

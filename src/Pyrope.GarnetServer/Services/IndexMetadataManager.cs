@@ -12,7 +12,7 @@ namespace Pyrope.GarnetServer.Services
         {
             if (string.IsNullOrWhiteSpace(tenantId)) throw new ArgumentException("Tenant ID cannot be empty", nameof(tenantId));
             if (string.IsNullOrWhiteSpace(indexName)) throw new ArgumentException("Index Name cannot be empty", nameof(indexName));
-            
+
             return $"{Prefix}:{tenantId}:{indexName}";
         }
 
@@ -30,8 +30,8 @@ namespace Pyrope.GarnetServer.Services
 
         public IndexConfig? DeserializeConfig(string json)
         {
-             if (string.IsNullOrWhiteSpace(json)) return null;
-             return JsonSerializer.Deserialize<IndexConfig>(json);
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            return JsonSerializer.Deserialize<IndexConfig>(json);
         }
     }
 }

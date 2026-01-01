@@ -18,12 +18,12 @@ namespace Pyrope.GarnetServer.Extensions
         public const int VEC_DEL = 12;
         public const int VEC_SEARCH = 13;
         public const int VEC_STATS = 14;
-        
+
         public static VectorIndexRegistry SharedIndexRegistry => IndexRegistry;
-        
+
         private static readonly VectorStore Store = new();
         private static readonly VectorIndexRegistry IndexRegistry = new();
-        
+
         private readonly VectorCommandType _commandType;
         private readonly ResultCache? _resultCache;
         private readonly IPolicyEngine? _policyEngine;
@@ -89,49 +89,49 @@ namespace Pyrope.GarnetServer.Extensions
                 {
                     queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
                     policyDecision = _policyEngine.Evaluate(queryKey);
-                    
+
                     if (policyDecision.ShouldCache)
                     {
                         // 1. Try L0 (Precise/Exact)
-                         if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
-                         {
-                             var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
-                             if (cachedHits != null)
-                             {
-                                 WriteResults(ref output, cachedHits, request.IncludeMeta);
-                                 _metrics?.RecordCacheHit();
-                                 sw.Stop();
-                                 _metrics?.RecordSearchLatency(sw.Elapsed);
-                                 return true;
-                             }
-                         }
-                         else
-                         {
-                             // 2. Try L1 (Semantic/Fuzzy)
-                             if (_lshService != null)
-                             {
-                                 var simHash = _lshService.GenerateSimHash(request.Vector);
-                                 var roundedK = QueryKey.RoundK(request.TopK);
-                                 var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
-                                 
-                                 if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
-                                 {
-                                     var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
-                                     if (l1Hits != null)
-                                     {
-                                         WriteResults(ref output, l1Hits, request.IncludeMeta);
-                                         _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
-                                         sw.Stop();
-                                         _metrics?.RecordSearchLatency(sw.Elapsed);
-                                         return true;
-                                     }
-                                 }
-                                 // Close L1 check
-                             }
+                        if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
+                        {
+                            var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
+                            if (cachedHits != null)
+                            {
+                                WriteResults(ref output, cachedHits, request.IncludeMeta);
+                                _metrics?.RecordCacheHit();
+                                sw.Stop();
+                                _metrics?.RecordSearchLatency(sw.Elapsed);
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            // 2. Try L1 (Semantic/Fuzzy)
+                            if (_lshService != null)
+                            {
+                                var simHash = _lshService.GenerateSimHash(request.Vector);
+                                var roundedK = QueryKey.RoundK(request.TopK);
+                                var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
 
-                             // If we reached here, both L0 and L1 (if enabled) missed
-                             _metrics?.RecordCacheMiss();
-                         }
+                                if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
+                                {
+                                    var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
+                                    if (l1Hits != null)
+                                    {
+                                        WriteResults(ref output, l1Hits, request.IncludeMeta);
+                                        _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
+                                        sw.Stop();
+                                        _metrics?.RecordSearchLatency(sw.Elapsed);
+                                        return true;
+                                    }
+                                }
+                                // Close L1 check
+                            }
+
+                            // If we reached here, both L0 and L1 (if enabled) missed
+                            _metrics?.RecordCacheMiss();
+                        }
                     }
                 }
 
@@ -175,7 +175,7 @@ namespace Pyrope.GarnetServer.Extensions
                 if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
                 {
                     var json = System.Text.Json.JsonSerializer.Serialize(results);
-                    
+
                     // Set L0 (Exact)
                     _resultCache.Set(queryKey, json, policyDecision.Ttl);
 
