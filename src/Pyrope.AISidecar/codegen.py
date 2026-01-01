@@ -1,11 +1,12 @@
 import os
-import sys
+
 from grpc_tools import protoc
+
 
 def generate():
     proto_path = '../Protos'
     out_path = '.'
-    
+
     if not os.path.exists(proto_path):
         print(f"Error: {proto_path} not found.")
         return
@@ -19,6 +20,7 @@ def generate():
         'policy_service.proto',
     ))
     print("Done.")
+
 
 if __name__ == '__main__':
     generate()

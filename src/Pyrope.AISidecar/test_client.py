@@ -2,6 +2,7 @@ import grpc
 import policy_service_pb2
 import policy_service_pb2_grpc
 
+
 def run():
     print("Connecting to server...")
     with grpc.insecure_channel('localhost:50051') as channel:
@@ -16,6 +17,7 @@ def run():
         print(f"  PQ Cons: {response.pq_construction}")
         print(f"  PCA Dim: {response.pca_dimension}")
         print(f"  Status: {response.status}")
+
 
 if __name__ == '__main__':
     run()

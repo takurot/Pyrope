@@ -6,6 +6,7 @@ import time
 import policy_service_pb2
 import policy_service_pb2_grpc
 
+
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def GetIndexPolicy(self, request, context):
         print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
@@ -15,6 +16,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             pca_dimension=64,
             status="OK"
         )
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -27,6 +29,7 @@ def serve():
             time.sleep(86400)
     except KeyboardInterrupt:
         server.stop(0)
+
 
 if __name__ == '__main__':
     serve()
