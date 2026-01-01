@@ -218,6 +218,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented `Hot Path Policy Engine` (P2-3) with `IPolicyEngine` interface and `StaticPolicyEngine` (Fixed TTL).
 - Integrated `PolicyEngine` and `ResultCache` into `VEC.SEARCH`, enabling cache hits, miss caching, and TTL expiry.
 - Added `MemoryCacheStorage` for in-memory caching during search operations.
+- automated local quality checks with `scripts/check_quality.sh` and updated `prompt/PROMPT.md` guidelines.
 
 ## Tests
 
