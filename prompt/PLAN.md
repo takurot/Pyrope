@@ -77,7 +77,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P4-1** | [Core] | **Metrics Aggregation for Sidecar**<br>Collect `QPS`, `MissRate`, `Latency`, `CPU/GPU utilization` in Garnet. Periodically push/pull stats to AI Sidecar via GRPC. | P2-5, P0-3 | [ ] |
+| **P4-1** | [Core] | **Metrics Aggregation for Sidecar**<br>Collect `QPS`, `MissRate`, `Latency`, `CPU/GPU utilization` in Garnet. Periodically push/pull stats to AI Sidecar via GRPC. | P2-5, P0-3 | [x] |
 | **P4-2** | [ML] | **Feature Engineering Pipeline**<br>Implement feature extraction: query features (norm, topK, filter type), system features (QPS, queue depth), history features (hit rate, revisit interval). | P4-1 | [ ] |
 | **P4-3** | [ML] | **Simple Heuristic Policy (Warm Path)**<br>Implement logic in Python: "If MissRate > X, increase TTL". Return updated Policy config (admit, ttl, evict_priority) to Garnet. | P0-2, P4-2 | [ ] |
 | **P4-4** | [Core] | **Policy Update Mechanism**<br>Receive Policy config from Sidecar. Thread-safe update of Hot Path parameters (Atomic swap of Lookup Table/Bloom Filter). | P4-1, P4-3 | [ ] |
@@ -228,12 +228,14 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Added Cache Management API for policy updates, flush, and invalidate operations backed by an in-memory admin store.
 - Added Health and Metrics endpoints returning readiness status and Prometheus-format stats.
 - Added TRACE and request_id support to `VEC.SEARCH` with latency breakdown payloads.
+- Added sidecar metrics reporting with QPS/miss rate/latency/CPU utilization aggregation and GRPC push to the AI sidecar.
 
 ## Tests
 
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj`
 - `dotnet test Pyrope.sln`
 - `./scripts/check_quality.sh`
+- `./scripts/check_quality.sh` (P4-1)
 
 ---
 

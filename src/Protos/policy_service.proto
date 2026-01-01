@@ -4,6 +4,7 @@ package pyrope.policy;
 
 service PolicyService {
   rpc GetIndexPolicy (IndexPolicyRequest) returns (IndexPolicyResponse);
+  rpc ReportSystemMetrics (SystemMetricsRequest) returns (SystemMetricsResponse);
 }
 
 message IndexPolicyRequest {
@@ -18,4 +19,20 @@ message IndexPolicyResponse {
   int32 pq_construction = 2;
   int32 pca_dimension = 3;
   string status = 4;
+}
+
+message SystemMetricsRequest {
+  double qps = 1;
+  double miss_rate = 2;
+  double latency_p99_ms = 3;
+  double cpu_utilization = 4;
+  double gpu_utilization = 5;
+  int64 cache_hit_total = 6;
+  int64 cache_miss_total = 7;
+  int64 timestamp_unix_ms = 8;
+}
+
+message SystemMetricsResponse {
+  string status = 1;
+  int32 next_report_interval_ms = 2;
 }

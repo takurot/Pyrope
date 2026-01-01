@@ -9,6 +9,7 @@ namespace Pyrope.GarnetServer.Services
         void RecordSearchLatency(TimeSpan duration);
         void RecordEviction(string reason);
         string GetStats();
+        MetricsSnapshot GetSnapshot();
         void Reset();
     }
 }

@@ -12,6 +12,17 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
         return policy_service_pb2.IndexPolicyResponse(pq_m=16, pq_construction=200, pca_dimension=64, status="OK")
 
+    def ReportSystemMetrics(self, request, context):
+        print(
+            "Metrics: "
+            f"qps={request.qps:.2f} "
+            f"miss_rate={request.miss_rate:.2f} "
+            f"latency_p99_ms={request.latency_p99_ms:.2f} "
+            f"cpu={request.cpu_utilization:.2f} "
+            f"gpu={request.gpu_utilization:.2f}"
+        )
+        return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0)
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

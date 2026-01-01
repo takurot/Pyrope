@@ -13,6 +13,8 @@ namespace Pyrope.GarnetServer
     {
         public static void Main(string[] args)
         {
+            AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddControllers();
 
@@ -23,6 +25,7 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<ICacheAdmin>(sp => sp.GetRequiredService<MemoryCacheStorage>());
             builder.Services.AddSingleton<IMetricsCollector, MetricsCollector>();
             builder.Services.AddSingleton(sp => (MetricsCollector)sp.GetRequiredService<IMetricsCollector>()); // Alias if needed
+            builder.Services.AddSingleton<ISystemUsageProvider, SystemUsageProvider>();
             builder.Services.AddSingleton<LshService>(_ => new LshService());
             builder.Services.AddSingleton<ResultCache>();
             builder.Services.AddSingleton<CachePolicyStore>();
@@ -35,6 +38,7 @@ namespace Pyrope.GarnetServer
 
             // Register GarnetService as Hosted Service
             builder.Services.AddHostedService<GarnetService>();
+            builder.Services.AddHostedService<SidecarMetricsReporter>();
 
             var app = builder.Build();
             app.MapControllers();

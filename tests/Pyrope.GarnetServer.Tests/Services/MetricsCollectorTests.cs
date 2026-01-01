@@ -51,5 +51,22 @@ namespace Pyrope.GarnetServer.Tests.Services
             var stats = collector.GetStats();
             Assert.Contains("cache_hit_total 0", stats);
         }
+
+        [Fact]
+        public void GetSnapshot_ShouldReturnTotals()
+        {
+            var collector = new MetricsCollector();
+            collector.RecordCacheHit();
+            collector.RecordCacheMiss();
+            collector.RecordEviction("ttl");
+            collector.RecordSearchLatency(TimeSpan.FromMilliseconds(2));
+
+            var snapshot = collector.GetSnapshot();
+
+            Assert.Equal(1, snapshot.CacheHits);
+            Assert.Equal(1, snapshot.CacheMisses);
+            Assert.Equal(1, snapshot.Evictions);
+            Assert.Equal(1, snapshot.LatencyBuckets[1]);
+        }
     }
 }
