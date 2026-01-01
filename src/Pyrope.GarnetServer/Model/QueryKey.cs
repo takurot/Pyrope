@@ -14,19 +14,23 @@ namespace Pyrope.GarnetServer.Model
         public VectorMetric Metric { get; }
         public IReadOnlySet<string> FilterTags { get; }
 
+        public long? SimHash { get; }
+
         public QueryKey(
             string tenantId,
             string indexName,
             float[] vector,
             int topK,
             VectorMetric metric,
-            IReadOnlyList<string>? filterTags)
+            IReadOnlyList<string>? filterTags,
+            long? simHash = null)
         {
             TenantId = tenantId;
             IndexName = indexName;
             Vector = vector;
             TopK = topK;
             Metric = metric;
+            SimHash = simHash;
             
             // Normalize tags: Case-sensitive, sorted/set for uniqueness and order-independence in equality
             if (filterTags == null || filterTags.Count == 0)
@@ -37,6 +41,16 @@ namespace Pyrope.GarnetServer.Model
             {
                  FilterTags = new HashSet<string>(filterTags);
             }
+        }
+
+        public static int RoundK(int k)
+        {
+            if (k <= 5) return 5;
+            if (k <= 10) return 10;
+            if (k <= 20) return 20;
+            if (k <= 50) return 50;
+            if (k <= 100) return 100;
+            return k;
         }
 
         public bool Equals(QueryKey? other)
@@ -53,16 +67,17 @@ namespace Pyrope.GarnetServer.Model
             // Check tags (Set equality)
             if (!FilterTags.SetEquals(other.FilterTags)) return false;
 
-            // Check vector (Exact match)
-            // Note: Floating point equality can be tricky, but for caching exact same vector input is the expectation for Level 0.
+            // Check Semantic vs Exact
+            if (SimHash.HasValue && other.SimHash.HasValue)
+            {
+                // L1: Compare SimHash
+                return SimHash.Value == other.SimHash.Value;
+            }
+            
+            // L0: Check vector (Exact match)
+            if (SimHash.HasValue != other.SimHash.HasValue) return false; // Mixing types?
+
             if (Vector.Length != other.Vector.Length) return false;
-            
-            // Using Span sequence equal for performance if possible, or simple loop
-            // ReadOnlySpan<float> v1 = Vector;
-            // ReadOnlySpan<float> v2 = other.Vector;
-            // return v1.SequenceEqual(v2);
-            
-            // Fallback for IEnumerable/Array if Span is annoying in this context (it is fine here though)
             return Vector.AsSpan().SequenceEqual(other.Vector.AsSpan());
         }
 
@@ -79,17 +94,6 @@ namespace Pyrope.GarnetServer.Model
             hashCode.Add(TopK);
             hashCode.Add(Metric);
 
-            // Vector Hash
-            // We can't easily hash every float in a large vector for the hash code, performance penalty.
-            // But for correctness we should include at least some representative parts or a subset.
-            // For a robust implementation, let's hash the length and maybe a few sample points or a stride.
-            // Or just loop through all if vectors aren't huge. Let's try looping all for correctness first (Level 0).
-            // Optimization: If vector is immutable, we can cache the hash code. 
-            // Since it's a record-like class, let's assume it's effectively immutable.
-            
-            // Actually, HashCode.Add(IEnumerable) isn't standard in older .NET, but we are likely on .NET 6/8.
-            // Let's implement a manual accumulation for vector and tags to be safe and order-independent for tags.
-            
             // Tags: Order-independent hash. XOR is good for this.
             int tagsHash = 0;
             if (FilterTags != null)
@@ -101,18 +105,17 @@ namespace Pyrope.GarnetServer.Model
             }
             hashCode.Add(tagsHash);
 
-            // Vector: Order-dependent
-            // To avoid iterating 1000s of floats every GetHashCode call, we could cache it. 
-            // But let's keep it simple for now. 
-            // We will just hash the first few elements and length to speed it up, assuming vectors are distinct enough.
-            // BUT "Exact Match" is required. If we only hash partial, we rely on Equals to distinct. Resulting in collisions if first few dims are same.
-            // Better to hash the whole thing or a strided sample.
-            
-            // Let's do a stride loop for performance/good distribution balance.
-            for (int i = 0; i < Vector.Length; i++)
+            if (SimHash.HasValue)
             {
-                // Simple accumulation
-                hashCode.Add(Vector[i]);
+                hashCode.Add(SimHash.Value);
+            }
+            else
+            {
+                // Vector: Order-dependent
+                for (int i = 0; i < Vector.Length; i++)
+                {
+                    hashCode.Add(Vector[i]);
+                }
             }
 
             return hashCode.ToHashCode();

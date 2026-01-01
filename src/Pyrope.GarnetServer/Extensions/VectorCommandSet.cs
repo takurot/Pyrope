@@ -28,13 +28,15 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly ResultCache? _resultCache;
         private readonly IPolicyEngine? _policyEngine;
         private readonly IMetricsCollector? _metrics;
+        private readonly LshService? _lshService;
 
-        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null)
+        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null, LshService? lshService = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
             _policyEngine = policyEngine;
             _metrics = metrics;
+            _lshService = lshService;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -78,6 +80,7 @@ namespace Pyrope.GarnetServer.Extensions
                 var args = ReadArgs(ref input);
                 var request = VectorCommandParser.ParseSearch(tenantId, args);
 
+
                 // --- CACHE LOOKUP ---
                 QueryKey? queryKey = null;
                 PolicyDecision policyDecision = PolicyDecision.NoCache;
@@ -86,55 +89,12 @@ namespace Pyrope.GarnetServer.Extensions
                 {
                     queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
                     policyDecision = _policyEngine.Evaluate(queryKey);
-
-                    if (policyDecision.ShouldCache)
-                    {
-                        if (_resultCache.TryGet(queryKey, out var cachedJson) && cachedJson != null)
-                        {
-                            // Cache Hit! Write raw JSON and return
-                            // The cachedJson is the inner array content, need to wrap/parse?
-                            // Based on ResultCache implementation, it stores the ResultJson string.
-                            // We need to write it to output.
-                            // But RESP expects specific structure. 
-                            // Standard output format:
-                            // [count, [id, score, meta], [id, score, meta], ...]
-                            
-                            // If cachedJson is raw RESP string? No, it's seemingly DTO JSON. 
-                            // ResultCacheTests uses "[]" as resultString.
-                            // Let's look at how we traverse results below.
-                            
-                            // We need to reconstruct the RESP response from cached JSON.
-                            // This is expensive. Ideally we cache the RESP binary or close to it.
-                            // But ResultCache stores string ResultJson.
-                            // Let's assume for MVP we deserialize and write.
-                            // Or if ResultCache stores the *RESP formatted* string?
-                            // Let's check ResultCache usage.
-                            
-                            // Wait, if I change the logic to store "serialized search hits" I can just output them?
-                            // Below, we loop and write.
-                            
-                            // Let's just execute search for now if cache miss, then store results.
-                        }
-                    }
-                }
-                
-
-                // --- END CACHE LOOKUP (Part 1 - logic placeholder, will finish inside flow) ---
-
-                // Re-doing the flow for clean caching integration:
-                
-                if (_policyEngine != null && _resultCache != null)
-                {
-                    queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
-                    policyDecision = _policyEngine.Evaluate(queryKey);
                     
                     if (policyDecision.ShouldCache)
                     {
+                        // 1. Try L0 (Precise/Exact)
                          if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
                          {
-                             // Deserialize hits to write to output
-                             // This requires making SearchHit public or having a DTO.
-                             // For now, let's assume we can rely on standard JSON serialization of list of hits.
                              var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
                              if (cachedHits != null)
                              {
@@ -147,6 +107,29 @@ namespace Pyrope.GarnetServer.Extensions
                          }
                          else
                          {
+                             // 2. Try L1 (Semantic/Fuzzy)
+                             if (_lshService != null)
+                             {
+                                 var simHash = _lshService.GenerateSimHash(request.Vector);
+                                 var roundedK = QueryKey.RoundK(request.TopK);
+                                 var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                                 
+                                 if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
+                                 {
+                                     var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
+                                     if (l1Hits != null)
+                                     {
+                                         WriteResults(ref output, l1Hits, request.IncludeMeta);
+                                         _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
+                                         sw.Stop();
+                                         _metrics?.RecordSearchLatency(sw.Elapsed);
+                                         return true;
+                                     }
+                                 }
+                                 // Close L1 check
+                             }
+
+                             // If we reached here, both L0 and L1 (if enabled) missed
                              _metrics?.RecordCacheMiss();
                          }
                     }
@@ -192,7 +175,18 @@ namespace Pyrope.GarnetServer.Extensions
                 if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
                 {
                     var json = System.Text.Json.JsonSerializer.Serialize(results);
+                    
+                    // Set L0 (Exact)
                     _resultCache.Set(queryKey, json, policyDecision.Ttl);
+
+                    // Set L1 (Semantic)
+                    if (_lshService != null)
+                    {
+                        var simHash = _lshService.GenerateSimHash(request.Vector);
+                        var roundedK = QueryKey.RoundK(request.TopK);
+                        var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                        _resultCache.Set(l1Key, json, policyDecision.Ttl);
+                    }
                 }
 
                 sw.Stop();

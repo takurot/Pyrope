@@ -16,7 +16,8 @@ namespace Pyrope.GarnetServer
                 var indexRegistry = Pyrope.GarnetServer.Extensions.VectorCommandSet.SharedIndexRegistry;
                 var cacheStorage = new Pyrope.GarnetServer.Model.MemoryCacheStorage();
                 var metricsCollector = new Pyrope.GarnetServer.Services.MetricsCollector();
-                
+                var lshService = new Pyrope.GarnetServer.Services.LshService();
+
                 var resultCache = new Pyrope.GarnetServer.Model.ResultCache(cacheStorage, indexRegistry, metricsCollector);
                 // Default TTL 60 seconds
                 var policyEngine = new Pyrope.GarnetServer.Policies.StaticPolicyEngine(TimeSpan.FromSeconds(60));
@@ -26,8 +27,8 @@ namespace Pyrope.GarnetServer
                 server.Register.NewCommand("VEC.UPSERT", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Upsert), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
                 server.Register.NewCommand("VEC.DEL", Garnet.server.CommandType.ReadModifyWrite, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Del), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
                 
-                // VEC.SEARCH with Caching & Policy & Metrics
-                server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Search, resultCache, policyEngine, metricsCollector), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                // VEC.SEARCH with Caching & Policy & Metrics & LSH
+                server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Search, resultCache, policyEngine, metricsCollector, lshService), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
                 // VEC.STATS
                 server.Register.NewCommand("VEC.STATS", Garnet.server.CommandType.Read, new Pyrope.GarnetServer.Extensions.VectorCommandSet(Pyrope.GarnetServer.Extensions.VectorCommandType.Stats, null, null, metricsCollector), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)Pyrope.GarnetServer.Extensions.VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });

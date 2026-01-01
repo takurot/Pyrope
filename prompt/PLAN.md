@@ -54,8 +54,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P2-2** | [Core] | **Result Cache (L0)**<br>Implement `ResultCache` (QueryKey → topK results). Use Garnet's key-value store. Include `epoch` field for invalidation. | P2-1 | [x] |
 | **P2-3** | [Core] | **Hot Path Policy Engine**<br>Create `PolicyCheck` hook in `VEC.SEARCH`. Implement static rules (e.g., "Always Cache", "TTL=60s"). Thread-safe atomic swap for policy updates. | P2-2 | [x] |
 | **P2-4** | [Core] | **Epoch-Based Cache Invalidation**<br>Increment `version_epoch` on index updates. Invalidate cache entries with stale epoch. | P2-2, P1-3 | [ ] |
-| **P2-5** | [Core] | **Cache Hit/Miss Telemetry**<br>Add metrics: `cache_hit`, `cache_miss`, `latency_p99`. Expose via Prometheus-style endpoint. Include `cache_eviction_total` with reason. | P2-3 | [ ] |
-| **P2-6** | [Core] | **Semantic Caching (L1: Quantized QueryKey)**<br>Implement SimHash quantization (512dim→64bit). TopK rounding (5/10/20/50/100). | P2-1 | [ ] |
+| **P2-5** | [Core] | **Cache Hit/Miss Telemetry**<br>Add metrics: `cache_hit`, `cache_miss`, `latency_p99`. Expose via Prometheus-style endpoint. Include `cache_eviction_total` with reason. | P2-3 | [x] |
+| **P2-6** | [Core] | **Semantic Caching (L1: Quantized QueryKey)**<br>Implement SimHash quantization (512dim→64bit). TopK rounding (5/10/20/50/100). | P2-1 | [x] |
 
 ---
 

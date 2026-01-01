@@ -65,5 +65,56 @@ namespace Pyrope.GarnetServer.Tests.Model
 
             Assert.Equal(hash1, hash2);
         }
+        [Theory]
+        [InlineData(1, 5)]
+        [InlineData(4, 5)]
+        [InlineData(5, 5)]
+        [InlineData(6, 10)]
+        [InlineData(9, 10)]
+        [InlineData(11, 20)]
+        [InlineData(49, 50)]
+        [InlineData(51, 100)]
+        [InlineData(101, 101)] // No rounding above 100 (for now, or maybe just return K)
+        public void RoundK_ShouldBucketCorrectly(int inputK, int expectedK)
+        {
+            var result = QueryKey.RoundK(inputK);
+            Assert.Equal(expectedK, result);
+        }
+        [Fact]
+        public void Equals_ShouldUseSimHash_WhenProvided()
+        {
+            var v1 = new float[] { 1, 0 };
+            var v2 = new float[] { 0, 1 }; // Different vectors
+
+            // Same SimHash, implies L1 match
+            var k1 = new QueryKey("t1", "i1", v1, 10, VectorMetric.L2, null, simHash: 12345);
+            var k2 = new QueryKey("t1", "i1", v2, 10, VectorMetric.L2, null, simHash: 12345);
+
+            Assert.Equal(k1, k2);
+            Assert.Equal(k1.GetHashCode(), k2.GetHashCode());
+        }
+
+        [Fact]
+        public void Equals_ShouldFail_WhenSimHashDiffers()
+        {
+            var v1 = new float[] { 1, 0 };
+            // Same vector, different SimHash (unlikely in real life but possible if model changes)
+            var k1 = new QueryKey("t1", "i1", v1, 10, VectorMetric.L2, null, simHash: 12345);
+            var k2 = new QueryKey("t1", "i1", v1, 10, VectorMetric.L2, null, simHash: 67890);
+
+            Assert.NotEqual(k1, k2);
+        }
+
+        [Fact]
+        public void Equals_ShouldFallBackToVector_WhenSimHashMissing()
+        {
+            var v1 = new float[] { 1, 0 };
+            var v2 = new float[] { 0, 1 };
+
+            var k1 = new QueryKey("t1", "i1", v1, 10, VectorMetric.L2, null);
+            var k2 = new QueryKey("t1", "i1", v2, 10, VectorMetric.L2, null);
+
+            Assert.NotEqual(k1, k2); // L0 behavior
+        }
     }
 }
