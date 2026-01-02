@@ -9,6 +9,7 @@ namespace Pyrope.GarnetServer.Services
         private long _cacheHits;
         private long _cacheMisses;
         private long _evictions;
+        private long _aiFallbacks;
 
         // Simple latency buckets (count)
         // <1ms, <5ms, <10ms, <50ms, <100ms, >100ms
@@ -28,6 +29,11 @@ namespace Pyrope.GarnetServer.Services
         {
             // For MVP just counting total evictions, reason is logged or ignored for agg.
             Interlocked.Increment(ref _evictions);
+        }
+
+        public void RecordAiFallback()
+        {
+            Interlocked.Increment(ref _aiFallbacks);
         }
 
         public void RecordSearchLatency(TimeSpan duration)
@@ -59,6 +65,10 @@ namespace Pyrope.GarnetServer.Services
             sb.AppendLine($"# HELP cache_eviction_total Total number of cache evictions");
             sb.AppendLine($"# TYPE cache_eviction_total counter");
             sb.AppendLine($"cache_eviction_total {Interlocked.Read(ref _evictions)}");
+
+            sb.AppendLine($"# HELP ai_fallback_total Total number of AI fallback events");
+            sb.AppendLine($"# TYPE ai_fallback_total counter");
+            sb.AppendLine($"ai_fallback_total {Interlocked.Read(ref _aiFallbacks)}");
 
             sb.AppendLine($"# HELP vector_search_latency_ms Latency buckets");
             sb.AppendLine($"# TYPE vector_search_latency_ms histogram");
@@ -101,6 +111,7 @@ namespace Pyrope.GarnetServer.Services
                 Interlocked.Read(ref _cacheHits),
                 Interlocked.Read(ref _cacheMisses),
                 Interlocked.Read(ref _evictions),
+                Interlocked.Read(ref _aiFallbacks),
                 buckets);
         }
 
@@ -109,6 +120,7 @@ namespace Pyrope.GarnetServer.Services
             Interlocked.Exchange(ref _cacheHits, 0);
             Interlocked.Exchange(ref _cacheMisses, 0);
             Interlocked.Exchange(ref _evictions, 0);
+            Interlocked.Exchange(ref _aiFallbacks, 0);
             for (int i = 0; i < _latencyBuckets.Length; i++)
             {
                 Interlocked.Exchange(ref _latencyBuckets[i], 0);

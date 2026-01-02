@@ -4,5 +4,6 @@ namespace Pyrope.GarnetServer.Services
         long CacheHits,
         long CacheMisses,
         long Evictions,
+        long AiFallbacks,
         long[] LatencyBuckets);
 }

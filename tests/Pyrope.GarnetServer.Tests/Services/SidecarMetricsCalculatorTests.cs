@@ -9,8 +9,8 @@ namespace Pyrope.GarnetServer.Tests.Services
         [Fact]
         public void Calculate_ShouldComputeQpsAndMissRate()
         {
-            var previous = new MetricsSnapshot(10, 5, 0, new long[] { 5, 0, 0, 0, 0, 0 });
-            var current = new MetricsSnapshot(20, 15, 0, new long[] { 5, 5, 0, 0, 0, 0 });
+            var previous = new MetricsSnapshot(10, 5, 0, 0, new long[] { 5, 0, 0, 0, 0, 0 });
+            var current = new MetricsSnapshot(20, 15, 0, 0, new long[] { 5, 5, 0, 0, 0, 0 });
 
             var prevSystem = new SystemUsageSnapshot(
                 DateTimeOffset.FromUnixTimeMilliseconds(0),

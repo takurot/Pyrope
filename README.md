@@ -27,6 +27,16 @@ Pyrope uses a robust, layered architecture:
     *   **Warm Path (Sidecar)**: Runs complex inference (Python/ONNX) to update caching policies and scoring models asynchronously (10-50ms).
     *   Learns and evolves caching strategies continuously based on query logs.
 
+## ⚙️ Configuration
+
+Pyrope uses standard .NET configuration (appsettings/environment variables). Sidecar settings:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `Sidecar:Endpoint` | (unset) | gRPC endpoint for the AI sidecar (also supports `PYROPE_SIDECAR_ENDPOINT`). |
+| `Sidecar:MetricsIntervalSeconds` | 10 | Interval in seconds between metrics reports to the sidecar. |
+| `Sidecar:WarmPathTimeoutMs` | 50 | Timeout in milliseconds for warm-path responses before falling back to cached rules and incrementing `ai_fallback_total`. |
+
 ## 🎯 Use Cases
 
 *   **RAG (Retrieval-Augmented Generation)**: Stabilize P99 latency and reduce the cost of repetitive semantic queries.

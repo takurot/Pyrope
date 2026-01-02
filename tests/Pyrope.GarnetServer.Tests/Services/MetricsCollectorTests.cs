@@ -15,12 +15,14 @@ namespace Pyrope.GarnetServer.Tests.Services
             collector.RecordCacheHit();
             collector.RecordCacheMiss();
             collector.RecordEviction("ttl");
+            collector.RecordAiFallback();
 
             var stats = collector.GetStats();
 
             Assert.Contains("cache_hit_total 2", stats);
             Assert.Contains("cache_miss_total 1", stats);
             Assert.Contains("cache_eviction_total 1", stats);
+            Assert.Contains("ai_fallback_total 1", stats);
         }
 
         [Fact]
@@ -60,12 +62,14 @@ namespace Pyrope.GarnetServer.Tests.Services
             collector.RecordCacheMiss();
             collector.RecordEviction("ttl");
             collector.RecordSearchLatency(TimeSpan.FromMilliseconds(2));
+            collector.RecordAiFallback();
 
             var snapshot = collector.GetSnapshot();
 
             Assert.Equal(1, snapshot.CacheHits);
             Assert.Equal(1, snapshot.CacheMisses);
             Assert.Equal(1, snapshot.Evictions);
+            Assert.Equal(1, snapshot.AiFallbacks);
             Assert.Equal(1, snapshot.LatencyBuckets[1]);
         }
     }

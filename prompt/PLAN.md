@@ -82,7 +82,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P4-3** | [ML] | **Simple Heuristic Policy (Warm Path)**<br>Implement logic in Python: "If MissRate > X, increase TTL". Return updated Policy config (admit, ttl, evict_priority) to Garnet. | P0-2, P4-2 | [x] |
 | **P4-4** | [Core] | **Policy Update Mechanism**<br>Receive Policy config from Sidecar. Thread-safe update of Hot Path parameters (Atomic swap of Lookup Table/Bloom Filter). | P4-1, P4-3 | [x] |
 | **P4-5** | [ML] | **Offline Datagen Pipeline**<br>Logger to save query/decision logs to disk for training. Include tenant, query stats, system load, decision outcome. | P4-1 | [x] |
-| **P4-6** | [ML] | **Fallback Guardrail**<br>If Warm Path response > 50ms timeout, fallback to Hot Path cached rules or LRU. Monitor `ai_fallback_total`. | P4-4 | [ ] |
+| **P4-6** | [ML] | **Fallback Guardrail**<br>If Warm Path response > 50ms timeout, fallback to Hot Path cached rules or LRU. Monitor `ai_fallback_total`. | P4-4 | [x] |
 
 ---
 
@@ -234,6 +234,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented **P4-3 Simple Heuristic Policy (Warm Path)** in Python sidecar with GRPC proto updates and unit tests.
 - Implemented **P4-4 Policy Update Mechanism** in Garnet Core (Atomic policy swap & Sidecar integration).
 - Implemented **P4-5 Offline Datagen Pipeline** in AI Sidecar (JSONL logging for training).
+- Implemented **P4-6 Fallback Guardrail** with warm-path timeout enforcement and `ai_fallback_total` telemetry.
+- Added integration test coverage for warm-path timeout fallback and documented `Sidecar:WarmPathTimeoutMs` config.
 
 ## Tests
 
@@ -245,6 +247,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `./scripts/check_quality.sh` (P4-3)
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter StaticPolicyEngineTests` (P4-4)
 - `PYTHONPATH=src/Pyrope.AISidecar python3 -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"` (P4-5)
+- `./scripts/check_quality.sh` (P4-6)
+- `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter SidecarMetricsReporterTests`
 
 ---
 
