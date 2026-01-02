@@ -4,7 +4,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from policy_engine import HeuristicPolicyEngine
+from policy_engine import HeuristicPolicyEngine  # noqa: E402
 
 
 class PolicyEngineTests(unittest.TestCase):

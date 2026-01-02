@@ -12,13 +12,9 @@ class PolicyConfig:
 class HeuristicPolicyEngine:
     def __init__(self):
         # Default policy
-        self._default_policy = PolicyConfig(
-            admission_threshold=0.1, ttl_seconds=60, eviction_priority=0
-        )
+        self._default_policy = PolicyConfig(admission_threshold=0.1, ttl_seconds=60, eviction_priority=0)
         # Aggressive policy
-        self._aggressive_policy = PolicyConfig(
-            admission_threshold=0.05, ttl_seconds=300, eviction_priority=1
-        )
+        self._aggressive_policy = PolicyConfig(admission_threshold=0.05, ttl_seconds=300, eviction_priority=1)
 
     def compute_policy(self, miss_rate: float) -> PolicyConfig:
         """

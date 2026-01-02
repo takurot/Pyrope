@@ -16,17 +16,11 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._latest_system_features = None
 
     def GetIndexPolicy(self, request, context):
-        print(
-            f"Received request for tenant: {request.tenant_id}, index: {request.index_name}"
-        )
-        return policy_service_pb2.IndexPolicyResponse(
-            pq_m=16, pq_construction=200, pca_dimension=64, status="OK"
-        )
+        print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
+        return policy_service_pb2.IndexPolicyResponse(pq_m=16, pq_construction=200, pca_dimension=64, status="OK")
 
     def ReportSystemMetrics(self, request, context):
-        self._latest_system_features = self._feature_engineer.extract_system_features(
-            request.qps, queue_depth=None
-        )
+        self._latest_system_features = self._feature_engineer.extract_system_features(request.qps, queue_depth=None)
 
         # Compute policy based on miss_rate
         policy_config = self._policy_engine.compute_policy(request.miss_rate)
@@ -47,9 +41,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             eviction_priority=policy_config.eviction_priority,
         )
 
-        return policy_service_pb2.SystemMetricsResponse(
-            status="OK", next_report_interval_ms=0, policy=policy_proto
-        )
+        return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
 
 
 def serve():
