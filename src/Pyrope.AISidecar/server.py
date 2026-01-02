@@ -7,12 +7,14 @@ import policy_service_pb2
 import policy_service_pb2_grpc
 from feature_engineering import FeatureEngineer
 from policy_engine import HeuristicPolicyEngine
+from logger import QueryLogger
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
-    def __init__(self):
+    def __init__(self, log_path="logs/query_log.jsonl"):
         self._feature_engineer = FeatureEngineer()
         self._policy_engine = HeuristicPolicyEngine()
+        self._logger = QueryLogger(log_path)
         self._latest_system_features = None
 
     def GetIndexPolicy(self, request, context):
@@ -40,6 +42,23 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             ttl_seconds=policy_config.ttl_seconds,
             eviction_priority=policy_config.eviction_priority,
         )
+
+        # Log decision for offline datagen
+        # Use latest features if available
+        query_features = {}  # We don't have per-query features in ReportSystemMetrics yet
+        system_metrics = {
+            "qps": request.qps,
+            "miss_rate": request.miss_rate,
+            "latency_p99_ms": request.latency_p99_ms,
+            "cpu_utilization": request.cpu_utilization,
+            "gpu_utilization": request.gpu_utilization,
+        }
+        decision = {
+            "admission_threshold": policy_config.admission_threshold,
+            "ttl_seconds": policy_config.ttl_seconds,
+            "eviction_priority": policy_config.eviction_priority,
+        }
+        self._logger.log_decision(request.tenant_id, query_features, system_metrics, decision)
 
         return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
 
