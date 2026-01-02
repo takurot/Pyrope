@@ -4,7 +4,7 @@ import unittest
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from feature_engineering import (
+from feature_engineering import (  # noqa: E402
     FeatureEngineer,
     FILTER_TYPE_ENCODING,
     QueryHistory,
