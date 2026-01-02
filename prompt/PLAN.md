@@ -79,7 +79,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 |----|-------|------|--------------|--------|
 | **P4-1** | [Core] | **Metrics Aggregation for Sidecar**<br>Collect `QPS`, `MissRate`, `Latency`, `CPU/GPU utilization` in Garnet. Periodically push/pull stats to AI Sidecar via GRPC. | P2-5, P0-3 | [x] |
 | **P4-2** | [ML] | **Feature Engineering Pipeline**<br>Implement feature extraction: query features (norm, topK, filter type), system features (QPS, queue depth), history features (hit rate, revisit interval). | P4-1 | [x] |
-| **P4-3** | [ML] | **Simple Heuristic Policy (Warm Path)**<br>Implement logic in Python: "If MissRate > X, increase TTL". Return updated Policy config (admit, ttl, evict_priority) to Garnet. | P0-2, P4-2 | [ ] |
+| **P4-3** | [ML] | **Simple Heuristic Policy (Warm Path)**<br>Implement logic in Python: "If MissRate > X, increase TTL". Return updated Policy config (admit, ttl, evict_priority) to Garnet. | P0-2, P4-2 | [x] |
 | **P4-4** | [Core] | **Policy Update Mechanism**<br>Receive Policy config from Sidecar. Thread-safe update of Hot Path parameters (Atomic swap of Lookup Table/Bloom Filter). | P4-1, P4-3 | [ ] |
 | **P4-5** | [ML] | **Offline Datagen Pipeline**<br>Logger to save query/decision logs to disk for training. Include tenant, query stats, system load, decision outcome. | P4-1 | [ ] |
 | **P4-6** | [ML] | **Fallback Guardrail**<br>If Warm Path response > 50ms timeout, fallback to Hot Path cached rules or LRU. Monitor `ai_fallback_total`. | P4-4 | [ ] |
@@ -231,6 +231,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Added sidecar metrics reporting with QPS/miss rate/latency/CPU utilization aggregation and GRPC push to the AI sidecar.
 - Implemented AI sidecar feature engineering pipeline for query/system/history signals with history tracking.
 - Added unit tests for feature extraction helpers in the AI sidecar.
+- Implemented **P4-3 Simple Heuristic Policy (Warm Path)** in Python sidecar with GRPC proto updates and unit tests.
 
 ## Tests
 
@@ -239,6 +240,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `./scripts/check_quality.sh`
 - `./scripts/check_quality.sh` (P4-1)
 - `python3 -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"`
+- `./scripts/check_quality.sh` (P4-3)
 
 ---
 

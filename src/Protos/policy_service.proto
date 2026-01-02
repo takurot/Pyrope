@@ -35,4 +35,11 @@ message SystemMetricsRequest {
 message SystemMetricsResponse {
   string status = 1;
   int32 next_report_interval_ms = 2;
+  WarmPathPolicy policy = 3;
+}
+
+message WarmPathPolicy {
+  double admission_threshold = 1;
+  int32 ttl_seconds = 2;
+  int32 eviction_priority = 3;
 }

@@ -6,11 +6,13 @@ import time
 import policy_service_pb2
 import policy_service_pb2_grpc
 from feature_engineering import FeatureEngineer
+from policy_engine import HeuristicPolicyEngine
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def __init__(self):
         self._feature_engineer = FeatureEngineer()
+        self._policy_engine = HeuristicPolicyEngine()
         self._latest_system_features = None
 
     def GetIndexPolicy(self, request, context):
@@ -19,15 +21,27 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
     def ReportSystemMetrics(self, request, context):
         self._latest_system_features = self._feature_engineer.extract_system_features(request.qps, queue_depth=None)
+
+        # Compute policy based on miss_rate
+        policy_config = self._policy_engine.compute_policy(request.miss_rate)
+
         print(
             "Metrics: "
             f"qps={request.qps:.2f} "
             f"miss_rate={request.miss_rate:.2f} "
             f"latency_p99_ms={request.latency_p99_ms:.2f} "
             f"cpu={request.cpu_utilization:.2f} "
-            f"gpu={request.gpu_utilization:.2f}"
+            f"gpu={request.gpu_utilization:.2f} -> "
+            f"Policy(ttl={policy_config.ttl_seconds})"
         )
-        return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0)
+
+        policy_proto = policy_service_pb2.WarmPathPolicy(
+            admission_threshold=policy_config.admission_threshold,
+            ttl_seconds=policy_config.ttl_seconds,
+            eviction_priority=policy_config.eviction_priority,
+        )
+
+        return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
 
 
 def serve():
