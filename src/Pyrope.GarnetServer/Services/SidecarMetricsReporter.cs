@@ -17,6 +17,7 @@ namespace Pyrope.GarnetServer.Services
         private readonly ISystemUsageProvider _systemUsageProvider;
         private readonly IPolicyEngine _policyEngine;
         private readonly ILogger<SidecarMetricsReporter> _logger;
+        private readonly PolicyService.PolicyServiceClient? _policyClient;
         private readonly string? _sidecarEndpoint;
         private TimeSpan _reportInterval;
         private readonly TimeSpan _warmPathTimeout;
@@ -26,12 +27,14 @@ namespace Pyrope.GarnetServer.Services
             ISystemUsageProvider systemUsageProvider,
             IPolicyEngine policyEngine,
             IConfiguration configuration,
-            ILogger<SidecarMetricsReporter> logger)
+            ILogger<SidecarMetricsReporter> logger,
+            PolicyService.PolicyServiceClient? policyClient = null)
         {
             _metricsCollector = metricsCollector;
             _systemUsageProvider = systemUsageProvider;
             _policyEngine = policyEngine;
             _logger = logger;
+            _policyClient = policyClient;
             _sidecarEndpoint = configuration["Sidecar:Endpoint"] ?? Environment.GetEnvironmentVariable("PYROPE_SIDECAR_ENDPOINT");
 
             if (!int.TryParse(configuration["Sidecar:MetricsIntervalSeconds"], out var seconds))
@@ -51,14 +54,19 @@ namespace Pyrope.GarnetServer.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (string.IsNullOrWhiteSpace(_sidecarEndpoint))
+            if (_policyClient == null && string.IsNullOrWhiteSpace(_sidecarEndpoint))
             {
                 _logger.LogInformation("Sidecar metrics reporting disabled (no endpoint configured).");
                 return;
             }
 
-            using var channel = GrpcChannel.ForAddress(_sidecarEndpoint);
-            var client = new PolicyService.PolicyServiceClient(channel);
+            GrpcChannel? channel = null;
+            var client = _policyClient;
+            if (client == null)
+            {
+                channel = GrpcChannel.ForAddress(_sidecarEndpoint!);
+                client = new PolicyService.PolicyServiceClient(channel);
+            }
 
             var previousMetrics = _metricsCollector.GetSnapshot();
             var previousSystem = _systemUsageProvider.GetSnapshot();
@@ -131,6 +139,8 @@ namespace Pyrope.GarnetServer.Services
                     _logger.LogWarning(ex, "Failed to report metrics to sidecar");
                 }
             }
+
+            channel?.Dispose();
         }
     }
 }
