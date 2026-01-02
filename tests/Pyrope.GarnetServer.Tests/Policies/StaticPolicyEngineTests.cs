@@ -41,7 +41,7 @@ namespace Pyrope.GarnetServer.Tests.Policies
                 AdmissionThreshold = 0.5,
                 EvictionPriority = 10
             };
-            
+
             engine.UpdatePolicy(newPolicy);
 
             // Assert
