@@ -45,7 +45,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
         # Log decision for offline datagen
         # Use latest features if available
-        query_features = {} # We don't have per-query features in ReportSystemMetrics yet
+        query_features = {}  # We don't have per-query features in ReportSystemMetrics yet
         system_metrics = {
             "qps": request.qps,
             "miss_rate": request.miss_rate,

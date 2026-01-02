@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from logger import QueryLogger
 
+
 class TestQueryLogger(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -32,6 +33,7 @@ class TestQueryLogger(unittest.TestCase):
             self.assertEqual(entry["system_metrics"], system_metrics)
             self.assertEqual(entry["decision"], decision)
             self.assertIn("timestamp", entry)
+
 
 if __name__ == "__main__":
     unittest.main()

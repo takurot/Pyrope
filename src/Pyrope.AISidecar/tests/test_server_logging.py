@@ -4,8 +4,9 @@ import json
 import tempfile
 import shutil
 from unittest.mock import MagicMock
-from server import PolicyService
 import policy_service_pb2
+from server import PolicyService
+
 
 class TestPolicyServiceLogging(unittest.TestCase):
     def setUp(self):
@@ -24,11 +25,11 @@ class TestPolicyServiceLogging(unittest.TestCase):
         request.latency_p99_ms = 10.0
         request.cpu_utilization = 0.5
         request.gpu_utilization = 0.1
-        
+
         context = MagicMock()
-        
+
         self.service.ReportSystemMetrics(request, context)
-        
+
         self.assertTrue(os.path.exists(self.log_path))
         with open(self.log_path, "r") as f:
             lines = f.readlines()
@@ -37,6 +38,7 @@ class TestPolicyServiceLogging(unittest.TestCase):
             self.assertEqual(entry["tenant_id"], "tenant-1")
             self.assertEqual(entry["system_metrics"]["qps"], 100.0)
             self.assertIn("decision", entry)
+
 
 if __name__ == "__main__":
     unittest.main()

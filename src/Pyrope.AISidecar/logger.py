@@ -2,6 +2,7 @@ import json
 import time
 import os
 
+
 class QueryLogger:
     def __init__(self, log_path: str):
         self.log_path = log_path
