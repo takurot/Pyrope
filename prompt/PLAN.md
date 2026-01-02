@@ -92,7 +92,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
 | **P5-1** | [Core] | **Multi-tenancy Isolation**<br>Enforce `tenant_id` prefix on all keys/indexes. Implement namespace isolation. | P0-5 | [ ] |
-| **P5-2** | [Core] | **Tenant Quotas & QoS**<br>Implement QPS limits, concurrent execution limits, cache memory limits per tenant. | P5-1, P3-2 | [ ] |
+| **P5-2** | [Core] | **Tenant Quotas & QoS**<br>Implement QPS limits, concurrent execution limits, cache memory limits per tenant. | P5-1, P3-2 | [x] |
 | **P5-3** | [Core] | **Noisy Neighbor Mitigation**<br>Priority-based scheduling. On P99 breach: degrade low-priority tenant params, tighten admission. | P5-2, P2-5 | [ ] |
 | **P5-4** | [Core] | **SLO Guardrails (Shedding)**<br>If `P99 > Target`, auto-degrade search params (lower nprobe/efSearch). Implement `CACHE_HINT=force` SLO mode. | P2-5 | [ ] |
 | **P5-5** | [Security] | **Authentication**<br>Implement API Key authentication. mTLS for inter-service communication. | P3-1 | [ ] |
@@ -236,6 +236,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented **P4-5 Offline Datagen Pipeline** in AI Sidecar (JSONL logging for training).
 - Implemented **P4-6 Fallback Guardrail** with warm-path timeout enforcement and `ai_fallback_total` telemetry.
 - Added integration test coverage for warm-path timeout fallback and documented `Sidecar:WarmPathTimeoutMs` config.
+- Enforced tenant QPS/concurrency limits on vector commands and added per-tenant cache memory caps.
+- Added `TenantQuotaEnforcer` and `MemoryCacheStorage` quota tests.
 
 ## Tests
 
@@ -249,6 +251,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `PYTHONPATH=src/Pyrope.AISidecar python3 -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"` (P4-5)
 - `./scripts/check_quality.sh` (P4-6)
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter SidecarMetricsReporterTests`
+- `dotnet test Pyrope.sln` (P5-2)
+- `./scripts/check_quality.sh` (P5-2)
 
 ---
 

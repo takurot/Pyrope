@@ -31,14 +31,16 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly IPolicyEngine? _policyEngine;
         private readonly IMetricsCollector? _metrics;
         private readonly LshService? _lshService;
+        private readonly ITenantQuotaEnforcer? _quotaEnforcer;
 
-        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null, LshService? lshService = null)
+        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null, LshService? lshService = null, ITenantQuotaEnforcer? quotaEnforcer = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
             _policyEngine = policyEngine;
             _metrics = metrics;
             _lshService = lshService;
+            _quotaEnforcer = quotaEnforcer;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -79,177 +81,190 @@ namespace Pyrope.GarnetServer.Extensions
             {
                 var totalStart = Stopwatch.GetTimestamp();
                 var tenantId = System.Text.Encoding.UTF8.GetString(key);
-                var args = ReadArgs(ref input);
-                var request = VectorCommandParser.ParseSearch(tenantId, args);
-                var traceEnabled = request.Trace;
-                var requestId = request.RequestId;
-                if (traceEnabled && string.IsNullOrWhiteSpace(requestId))
+                TenantRequestLease? lease = null;
+                if (_quotaEnforcer != null && !_quotaEnforcer.TryBeginRequest(tenantId, out lease, out var errorCode, out var errorMessage))
                 {
-                    requestId = Guid.NewGuid().ToString("N");
+                    WriteErrorCode(ref output, errorCode ?? VectorErrorCodes.Busy, errorMessage ?? "Tenant quota exceeded.");
+                    return true;
                 }
 
-
-                // --- CACHE LOOKUP ---
-                QueryKey? queryKey = null;
-                PolicyDecision policyDecision = PolicyDecision.NoCache;
-                long policyStart = 0;
-                long policyEnd = 0;
-                long cacheStart = 0;
-                long cacheEnd = 0;
-                long faissStart = 0;
-                long faissEnd = 0;
-                var cacheHit = false;
-
-                if (_policyEngine != null && _resultCache != null)
+                try
                 {
-                    policyStart = Stopwatch.GetTimestamp();
-                    queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
-                    policyDecision = _policyEngine.Evaluate(queryKey);
-                    policyEnd = Stopwatch.GetTimestamp();
-
-                    if (policyDecision.ShouldCache)
+                    var args = ReadArgs(ref input);
+                    var request = VectorCommandParser.ParseSearch(tenantId, args);
+                    var traceEnabled = request.Trace;
+                    var requestId = request.RequestId;
+                    if (traceEnabled && string.IsNullOrWhiteSpace(requestId))
                     {
-                        cacheStart = Stopwatch.GetTimestamp();
-                        // 1. Try L0 (Precise/Exact)
-                        if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
-                        {
-                            var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
-                            if (cachedHits != null)
-                            {
-                                cacheHit = true;
-                                cacheEnd = Stopwatch.GetTimestamp();
-                                var totalEnd = Stopwatch.GetTimestamp();
-                                var traceJson = traceEnabled
-                                    ? JsonSerializer.Serialize(new TraceInfo
-                                    {
-                                        RequestId = requestId,
-                                        CacheHit = true,
-                                        LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
-                                        PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
-                                        CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                        FaissMs = 0
-                                    })
-                                    : null;
-                                WriteResults(ref output, cachedHits, request.IncludeMeta, traceJson);
-                                _metrics?.RecordCacheHit();
-                                _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            // 2. Try L1 (Semantic/Fuzzy)
-                            if (_lshService != null)
-                            {
-                                var simHash = _lshService.GenerateSimHash(request.Vector);
-                                var roundedK = QueryKey.RoundK(request.TopK);
-                                var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                        requestId = Guid.NewGuid().ToString("N");
+                    }
 
-                                if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
+
+                    // --- CACHE LOOKUP ---
+                    QueryKey? queryKey = null;
+                    PolicyDecision policyDecision = PolicyDecision.NoCache;
+                    long policyStart = 0;
+                    long policyEnd = 0;
+                    long cacheStart = 0;
+                    long cacheEnd = 0;
+                    long faissStart = 0;
+                    long faissEnd = 0;
+                    var cacheHit = false;
+
+                    if (_policyEngine != null && _resultCache != null)
+                    {
+                        policyStart = Stopwatch.GetTimestamp();
+                        queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
+                        policyDecision = _policyEngine.Evaluate(queryKey);
+                        policyEnd = Stopwatch.GetTimestamp();
+
+                        if (policyDecision.ShouldCache)
+                        {
+                            cacheStart = Stopwatch.GetTimestamp();
+                            // 1. Try L0 (Precise/Exact)
+                            if (_resultCache.TryGet(queryKey, out var cachedJson) && !string.IsNullOrEmpty(cachedJson))
+                            {
+                                var cachedHits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(cachedJson);
+                                if (cachedHits != null)
                                 {
-                                    var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
-                                    if (l1Hits != null)
-                                    {
-                                        cacheHit = true;
-                                        cacheEnd = Stopwatch.GetTimestamp();
-                                        var totalEnd = Stopwatch.GetTimestamp();
-                                        var traceJson = traceEnabled
-                                            ? JsonSerializer.Serialize(new TraceInfo
-                                            {
-                                                RequestId = requestId,
-                                                CacheHit = true,
-                                                LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
-                                                PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
-                                                CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                                FaissMs = 0
-                                            })
-                                            : null;
-                                        WriteResults(ref output, l1Hits, request.IncludeMeta, traceJson);
-                                        _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
-                                        _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
-                                        return true;
-                                    }
+                                    cacheHit = true;
+                                    cacheEnd = Stopwatch.GetTimestamp();
+                                    var totalEnd = Stopwatch.GetTimestamp();
+                                    var traceJson = traceEnabled
+                                        ? JsonSerializer.Serialize(new TraceInfo
+                                        {
+                                            RequestId = requestId,
+                                            CacheHit = true,
+                                            LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
+                                            PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                                            CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                                            FaissMs = 0
+                                        })
+                                        : null;
+                                    WriteResults(ref output, cachedHits, request.IncludeMeta, traceJson);
+                                    _metrics?.RecordCacheHit();
+                                    _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                    return true;
                                 }
-                                // Close L1 check
                             }
+                            else
+                            {
+                                // 2. Try L1 (Semantic/Fuzzy)
+                                if (_lshService != null)
+                                {
+                                    var simHash = _lshService.GenerateSimHash(request.Vector);
+                                    var roundedK = QueryKey.RoundK(request.TopK);
+                                    var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
 
-                            // If we reached here, both L0 and L1 (if enabled) missed
-                            cacheEnd = Stopwatch.GetTimestamp();
-                            _metrics?.RecordCacheMiss();
+                                    if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
+                                    {
+                                        var l1Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l1Json);
+                                        if (l1Hits != null)
+                                        {
+                                            cacheHit = true;
+                                            cacheEnd = Stopwatch.GetTimestamp();
+                                            var totalEnd = Stopwatch.GetTimestamp();
+                                            var traceJson = traceEnabled
+                                                ? JsonSerializer.Serialize(new TraceInfo
+                                                {
+                                                    RequestId = requestId,
+                                                    CacheHit = true,
+                                                    LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
+                                                    PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                                                    CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                                                    FaissMs = 0
+                                                })
+                                                : null;
+                                            WriteResults(ref output, l1Hits, request.IncludeMeta, traceJson);
+                                            _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
+                                            _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                            return true;
+                                        }
+                                    }
+                                    // Close L1 check
+                                }
+
+                                // If we reached here, both L0 and L1 (if enabled) missed
+                                cacheEnd = Stopwatch.GetTimestamp();
+                                _metrics?.RecordCacheMiss();
+                            }
                         }
                     }
-                }
+                    if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
+                        return true;
+                    }
 
-                if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
-                {
-                    WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
+                    if (index.Dimension != request.Vector.Length)
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.DimMismatch, "Vector dimension mismatch.");
+                        return true;
+                    }
+
+                    faissStart = Stopwatch.GetTimestamp();
+                    var rawResults = index.Search(request.Vector, request.TopK);
+                    faissEnd = Stopwatch.GetTimestamp();
+                    var results = new List<SearchHitDto>(rawResults.Count);
+                    foreach (var hit in rawResults)
+                    {
+                        if (!Store.TryGet(request.TenantId, request.IndexName, hit.Id, out var record))
+                        {
+                            continue;
+                        }
+
+                        if (record.Deleted)
+                        {
+                            continue;
+                        }
+
+                        if (request.FilterTags.Count > 0 && !HasAllTags(record.Tags, request.FilterTags))
+                        {
+                            continue;
+                        }
+
+                        results.Add(new SearchHitDto { Id = hit.Id, Score = hit.Score, MetaJson = record.MetaJson });
+                    }
+
+                    var totalFinish = Stopwatch.GetTimestamp();
+                    var tracePayload = traceEnabled
+                        ? JsonSerializer.Serialize(new TraceInfo
+                        {
+                            RequestId = requestId,
+                            CacheHit = cacheHit,
+                            LatencyMs = ElapsedMilliseconds(totalStart, totalFinish),
+                            PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                            CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                            FaissMs = ElapsedMilliseconds(faissStart, faissEnd)
+                        })
+                        : null;
+                    WriteResults(ref output, results, request.IncludeMeta, tracePayload);
+
+                    // --- CACHE SET ---
+                    if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
+                    {
+                        var json = System.Text.Json.JsonSerializer.Serialize(results);
+
+                        // Set L0 (Exact)
+                        _resultCache.Set(queryKey, json, policyDecision.Ttl);
+
+                        // Set L1 (Semantic)
+                        if (_lshService != null)
+                        {
+                            var simHash = _lshService.GenerateSimHash(request.Vector);
+                            var roundedK = QueryKey.RoundK(request.TopK);
+                            var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                            _resultCache.Set(l1Key, json, policyDecision.Ttl);
+                        }
+                    }
+
+                    _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalFinish)));
                     return true;
                 }
-
-                if (index.Dimension != request.Vector.Length)
+                finally
                 {
-                    WriteErrorCode(ref output, VectorErrorCodes.DimMismatch, "Vector dimension mismatch.");
-                    return true;
+                    lease?.Dispose();
                 }
-
-                faissStart = Stopwatch.GetTimestamp();
-                var rawResults = index.Search(request.Vector, request.TopK);
-                faissEnd = Stopwatch.GetTimestamp();
-                var results = new List<SearchHitDto>(rawResults.Count);
-                foreach (var hit in rawResults)
-                {
-                    if (!Store.TryGet(request.TenantId, request.IndexName, hit.Id, out var record))
-                    {
-                        continue;
-                    }
-
-                    if (record.Deleted)
-                    {
-                        continue;
-                    }
-
-                    if (request.FilterTags.Count > 0 && !HasAllTags(record.Tags, request.FilterTags))
-                    {
-                        continue;
-                    }
-
-                    results.Add(new SearchHitDto { Id = hit.Id, Score = hit.Score, MetaJson = record.MetaJson });
-                }
-
-                var totalFinish = Stopwatch.GetTimestamp();
-                var tracePayload = traceEnabled
-                    ? JsonSerializer.Serialize(new TraceInfo
-                    {
-                        RequestId = requestId,
-                        CacheHit = cacheHit,
-                        LatencyMs = ElapsedMilliseconds(totalStart, totalFinish),
-                        PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
-                        CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                        FaissMs = ElapsedMilliseconds(faissStart, faissEnd)
-                    })
-                    : null;
-                WriteResults(ref output, results, request.IncludeMeta, tracePayload);
-
-                // --- CACHE SET ---
-                if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(results);
-
-                    // Set L0 (Exact)
-                    _resultCache.Set(queryKey, json, policyDecision.Ttl);
-
-                    // Set L1 (Semantic)
-                    if (_lshService != null)
-                    {
-                        var simHash = _lshService.GenerateSimHash(request.Vector);
-                        var roundedK = QueryKey.RoundK(request.TopK);
-                        var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
-                        _resultCache.Set(l1Key, json, policyDecision.Ttl);
-                    }
-                }
-
-                _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalFinish)));
-                return true;
             }
             catch (Exception ex)
             {
@@ -271,52 +286,66 @@ namespace Pyrope.GarnetServer.Extensions
 
             try
             {
-                if (_commandType == VectorCommandType.Del)
-                {
-                    return HandleDelete(key, ref input, ref output);
-                }
-
                 var tenantId = System.Text.Encoding.UTF8.GetString(key);
-                var args = ReadArgs(ref input);
-                var request = VectorCommandParser.Parse(tenantId, args);
-
-                var record = new VectorRecord(
-                    request.TenantId,
-                    request.IndexName,
-                    request.Id,
-                    request.Vector,
-                    request.MetaJson,
-                    request.Tags,
-                    request.NumericFields,
-                    DateTimeOffset.UtcNow,
-                    DateTimeOffset.UtcNow);
-
-                var index = IndexRegistry.GetOrCreate(request.TenantId, request.IndexName, request.Vector.Length, VectorMetric.L2);
-
-                if (_commandType == VectorCommandType.Add)
+                TenantRequestLease? lease = null;
+                if (_quotaEnforcer != null && !_quotaEnforcer.TryBeginRequest(tenantId, out lease, out var errorCode, out var errorMessage))
                 {
-                    if (!Store.TryAdd(record))
-                    {
-                        WriteErrorCode(ref output, "ERR Vector already exists.");
-                        return true;
-                    }
-
-                    index.Add(request.Id, request.Vector);
-                }
-                else if (_commandType == VectorCommandType.Upsert)
-                {
-                    Store.Upsert(record);
-                    index.Upsert(request.Id, request.Vector);
-                }
-                else
-                {
-                    WriteErrorCode(ref output, "ERR Unsupported write command.");
+                    WriteErrorCode(ref output, errorCode ?? VectorErrorCodes.Busy, errorMessage ?? "Tenant quota exceeded.");
                     return true;
                 }
 
-                IndexRegistry.IncrementEpoch(request.TenantId, request.IndexName);
-                output.WriteSimpleString(VectorErrorCodes.Ok);
-                return true;
+                try
+                {
+                    if (_commandType == VectorCommandType.Del)
+                    {
+                        return HandleDelete(tenantId, ref input, ref output);
+                    }
+
+                    var args = ReadArgs(ref input);
+                    var request = VectorCommandParser.Parse(tenantId, args);
+
+                    var record = new VectorRecord(
+                        request.TenantId,
+                        request.IndexName,
+                        request.Id,
+                        request.Vector,
+                        request.MetaJson,
+                        request.Tags,
+                        request.NumericFields,
+                        DateTimeOffset.UtcNow,
+                        DateTimeOffset.UtcNow);
+
+                    var index = IndexRegistry.GetOrCreate(request.TenantId, request.IndexName, request.Vector.Length, VectorMetric.L2);
+
+                    if (_commandType == VectorCommandType.Add)
+                    {
+                        if (!Store.TryAdd(record))
+                        {
+                            WriteErrorCode(ref output, "ERR Vector already exists.");
+                            return true;
+                        }
+
+                        index.Add(request.Id, request.Vector);
+                    }
+                    else if (_commandType == VectorCommandType.Upsert)
+                    {
+                        Store.Upsert(record);
+                        index.Upsert(request.Id, request.Vector);
+                    }
+                    else
+                    {
+                        WriteErrorCode(ref output, "ERR Unsupported write command.");
+                        return true;
+                    }
+
+                    IndexRegistry.IncrementEpoch(request.TenantId, request.IndexName);
+                    output.WriteSimpleString(VectorErrorCodes.Ok);
+                    return true;
+                }
+                finally
+                {
+                    lease?.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -328,9 +357,8 @@ namespace Pyrope.GarnetServer.Extensions
             }
         }
 
-        private bool HandleDelete(ReadOnlySpan<byte> key, ref RawStringInput input, ref RespMemoryWriter output)
+        private bool HandleDelete(string tenantId, ref RawStringInput input, ref RespMemoryWriter output)
         {
-            var tenantId = System.Text.Encoding.UTF8.GetString(key);
             var args = ReadArgs(ref input);
             if (args.Count < 2)
             {

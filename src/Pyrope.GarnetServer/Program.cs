@@ -26,12 +26,14 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<IMetricsCollector, MetricsCollector>();
             builder.Services.AddSingleton(sp => (MetricsCollector)sp.GetRequiredService<IMetricsCollector>()); // Alias if needed
             builder.Services.AddSingleton<ISystemUsageProvider, SystemUsageProvider>();
+            builder.Services.AddSingleton<ITimeProvider, SystemTimeProvider>();
             builder.Services.AddSingleton<LshService>(_ => new LshService());
             builder.Services.AddSingleton<ResultCache>();
             builder.Services.AddSingleton<CachePolicyStore>();
             builder.Services.AddSingleton<DynamicPolicyEngine>();
             builder.Services.AddSingleton<IPolicyEngine>(sp => sp.GetRequiredService<DynamicPolicyEngine>());
             builder.Services.AddSingleton<TenantRegistry>();
+            builder.Services.AddSingleton<ITenantQuotaEnforcer, TenantQuotaEnforcer>();
 
             // Register Args for GarnetService
             builder.Services.AddSingleton(args);

@@ -14,18 +14,21 @@ namespace Pyrope.GarnetServer.Services
         private readonly IPolicyEngine _policyEngine;
         private readonly IMetricsCollector _metricsCollector;
         private readonly LshService _lshService;
+        private readonly ITenantQuotaEnforcer _quotaEnforcer;
 
         public GarnetService(
             ResultCache resultCache,
             IPolicyEngine policyEngine,
             IMetricsCollector metricsCollector,
             LshService lshService,
+            ITenantQuotaEnforcer quotaEnforcer,
             string[]? args = null)
         {
             _resultCache = resultCache;
             _policyEngine = policyEngine;
             _metricsCollector = metricsCollector;
             _lshService = lshService;
+            _quotaEnforcer = quotaEnforcer;
             _server = new Garnet.GarnetServer(args ?? Array.Empty<string>());
         }
 
@@ -57,12 +60,12 @@ namespace Pyrope.GarnetServer.Services
         private void RegisterCommands()
         {
             // Register Custom Commands
-            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
-            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
+            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, null, null, null, null, _quotaEnforcer), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert, null, null, null, null, _quotaEnforcer), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
+            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del, null, null, null, null, _quotaEnforcer), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
 
             // VEC.SEARCH with Caching & Policy & Metrics & LSH
-            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
             // VEC.STATS
             _server.Register.NewCommand("VEC.STATS", CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, _metricsCollector), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });
