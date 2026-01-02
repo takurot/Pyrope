@@ -51,12 +51,12 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             "miss_rate": request.miss_rate,
             "latency_p99_ms": request.latency_p99_ms,
             "cpu_utilization": request.cpu_utilization,
-            "gpu_utilization": request.gpu_utilization
+            "gpu_utilization": request.gpu_utilization,
         }
         decision = {
             "admission_threshold": policy_config.admission_threshold,
             "ttl_seconds": policy_config.ttl_seconds,
-            "eviction_priority": policy_config.eviction_priority
+            "eviction_priority": policy_config.eviction_priority,
         }
         self._logger.log_decision(request.tenant_id, query_features, system_metrics, decision)
 
