@@ -41,7 +41,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P1-3** | [Core] | **Implement `VEC.DEL`**<br>Logical deletion with `deleted: bool` flag. Support epoch/version management for cache invalidation. | P1-2 | [x] |
 | **P1-4** | [Core] | **Implement `VEC.SEARCH` (Brute Force)**<br>Basic Flat Search implementation. Support `TOPK`, `FILTER` (tag-based). Return RESP array with IDs, Scores, and optional Meta. | P1-2 | [x] |
 | **P1-5** | [Core] | **Error Code System**<br>Implement standardized error codes: `VEC_OK`, `VEC_ERR_DIM`, `VEC_ERR_NOT_FOUND`, `VEC_ERR_QUOTA`, `VEC_ERR_BUSY`. | P1-4 | [x] |
-| **P1-6** | [Ops] | **Vector Benchmarking Data & Tool**<br>Script to load SIFT1M/Glove datasets. Benchmark baseline latency/QPS of P1-4. | P1-4 | [ ] |
+| **P1-6** | [Ops] | **Vector Benchmarking Data & Tool**<br>Script to load SIFT1M/Glove datasets. Benchmark baseline latency/QPS of P1-4. | P1-4 | [x] |
 
 ---
 
@@ -53,7 +53,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P2-1** | [Core] | **QueryKey Generation (Level 0)**<br>Implement `QueryKey` hashing (Exact Match: vector hash + filter + topK + metric). | P1-4 | [x] |
 | **P2-2** | [Core] | **Result Cache (L0)**<br>Implement `ResultCache` (QueryKey → topK results). Use Garnet's key-value store. Include `epoch` field for invalidation. | P2-1 | [x] |
 | **P2-3** | [Core] | **Hot Path Policy Engine**<br>Create `PolicyCheck` hook in `VEC.SEARCH`. Implement static rules (e.g., "Always Cache", "TTL=60s"). Thread-safe atomic swap for policy updates. | P2-2 | [x] |
-| **P2-4** | [Core] | **Epoch-Based Cache Invalidation**<br>Increment `version_epoch` on index updates. Invalidate cache entries with stale epoch. | P2-2, P1-3 | [ ] |
+| **P2-4** | [Core] | **Epoch-Based Cache Invalidation**<br>Increment `version_epoch` on index updates. Invalidate cache entries with stale epoch. | P2-2, P1-3 | [x] |
 | **P2-5** | [Core] | **Cache Hit/Miss Telemetry**<br>Add metrics: `cache_hit`, `cache_miss`, `latency_p99`. Expose via Prometheus-style endpoint. Include `cache_eviction_total` with reason. | P2-3 | [x] |
 | **P2-6** | [Core] | **Semantic Caching (L1: Quantized QueryKey)**<br>Implement SimHash quantization (512dim→64bit). TopK rounding (5/10/20/50/100). | P2-1 | [x] |
 
@@ -91,7 +91,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P5-1** | [Core] | **Multi-tenancy Isolation**<br>Enforce `tenant_id` prefix on all keys/indexes. Implement namespace isolation. | P0-5 | [ ] |
+| **P5-1** | [Core] | **Multi-tenancy Isolation**<br>Enforce `tenant_id` prefix on all keys/indexes. Implement namespace isolation. | P0-5 | [x] |
 | **P5-2** | [Core] | **Tenant Quotas & QoS**<br>Implement QPS limits, concurrent execution limits, cache memory limits per tenant. | P5-1, P3-2 | [x] |
 | **P5-3** | [Core] | **Noisy Neighbor Mitigation**<br>Priority-based scheduling. On P99 breach: degrade low-priority tenant params, tighten admission. | P5-2, P2-5 | [ ] |
 | **P5-4** | [Core] | **SLO Guardrails (Shedding)**<br>If `P99 > Target`, auto-degrade search params (lower nprobe/efSearch). Implement `CACHE_HINT=force` SLO mode. | P2-5 | [ ] |
@@ -238,6 +238,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Added integration test coverage for warm-path timeout fallback and documented `Sidecar:WarmPathTimeoutMs` config.
 - Enforced tenant QPS/concurrency limits on vector commands and added per-tenant cache memory caps.
 - Added `TenantQuotaEnforcer` and `MemoryCacheStorage` quota tests.
+- Implemented **P1-6 Vector Benchmarking Data & Tool**: added `src/Pyrope.Benchmarks` (SIFT fvecs / GloVe txt loaders, QPS/latency reporting) and `scripts/bench_vectors.sh`.
 
 ## Tests
 
@@ -253,6 +254,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter SidecarMetricsReporterTests`
 - `dotnet test Pyrope.sln` (P5-2)
 - `./scripts/check_quality.sh` (P5-2)
+- `dotnet test Pyrope.sln --configuration Release` (P1-6)
+- `./scripts/check_quality.sh` (P1-6)
 
 ---
 

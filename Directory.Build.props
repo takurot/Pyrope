@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    macOS can generate AppleDouble sidecar files (._*) on some filesystems (e.g., exFAT/SMB).
+    They may be binary and can accidentally be picked up by SDK-style globbing, breaking builds.
+  -->
+  <ItemGroup>
+    <Compile Remove="**/._*.cs" />
+    <None Remove="**/._*" />
+    <Content Remove="**/._*" />
+    <EmbeddedResource Remove="**/._*" />
+  </ItemGroup>
+</Project>
+

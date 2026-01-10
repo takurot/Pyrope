@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Ensure AppleDouble sidecar files (._*) are excluded after SDK default items are included.
+    (Directory.Build.props can be too early for Remove to take effect.)
+  -->
+  <ItemGroup>
+    <Compile Remove="**/._*.cs" />
+    <None Remove="**/._*" />
+    <Content Remove="**/._*" />
+    <EmbeddedResource Remove="**/._*" />
+  </ItemGroup>
+</Project>
+

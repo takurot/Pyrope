@@ -60,6 +60,30 @@ VEC.SEARCH my_app main_idx TOPK 10 VECTOR \x00\x01...
 VEC.ADD my_app main_idx "doc1" VECTOR \x00\x01... META {"category":"news"}
 ```
 
+## 📈 Benchmarking (P1-6)
+
+Pyrope includes a simple benchmarking tool to load common datasets and measure baseline search latency/QPS.
+
+### Start server (RESP)
+
+```bash
+dotnet run --project src/Pyrope.GarnetServer -- --port 3278 --bind 127.0.0.1
+```
+
+### Run benchmark (SIFT1M fvecs)
+
+Prepare a directory containing `sift_base.fvecs` and `sift_query.fvecs`, then run:
+
+```bash
+./scripts/bench_vectors.sh --dataset sift --sift-dir ./datasets/sift1m --base-limit 100000 --query-limit 1000 --topk 10 --concurrency 16 --warmup 100
+```
+
+### Run benchmark (GloVe txt)
+
+```bash
+./scripts/bench_vectors.sh --dataset glove --glove-path ./datasets/glove/glove.6B.100d.txt --dim 100 --base-limit 200000 --query-limit 2000
+```
+
 ## 📊 Comparison
 
 | Feature | Pyrope | Pinecone | Milvus | Weaviate |
