@@ -14,13 +14,18 @@ COPY . .
 WORKDIR /app/src/Pyrope.GarnetServer
 RUN dotnet publish -c Release -o /app/out
 
-# Build runtime image
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+# Build runtime image (ASP.NET Core)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/out .
 
-# Expose Garnet port
+# Expose ports:
+# - 3278: Garnet (RESP)
+# - 5000: Control Plane (HTTP)
 EXPOSE 3278
+EXPOSE 5000
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:5000
 
 # Start
 ENTRYPOINT ["dotnet", "Pyrope.GarnetServer.dll", "--port", "3278", "--bind", "0.0.0.0"]

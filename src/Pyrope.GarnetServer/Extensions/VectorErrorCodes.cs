@@ -7,5 +7,6 @@ namespace Pyrope.GarnetServer.Extensions
         public const string NotFound = "VEC_ERR_NOT_FOUND";
         public const string Quota = "VEC_ERR_QUOTA";
         public const string Busy = "VEC_ERR_BUSY";
+        public const string Auth = "VEC_ERR_AUTH";
     }
 }

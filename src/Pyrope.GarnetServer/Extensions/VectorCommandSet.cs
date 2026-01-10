@@ -5,6 +5,7 @@ using System.Text.Json;
 using Garnet.common;
 using Garnet.server;
 using Pyrope.GarnetServer.Model;
+using Pyrope.GarnetServer.Security;
 using Pyrope.GarnetServer.Services;
 using Pyrope.GarnetServer.Vector;
 using Pyrope.GarnetServer.Policies;
@@ -32,8 +33,18 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly IMetricsCollector? _metrics;
         private readonly LshService? _lshService;
         private readonly ITenantQuotaEnforcer? _quotaEnforcer;
+        private readonly ITenantAuthenticator? _tenantAuthenticator;
+        private readonly ISloGuardrails? _sloGuardrails;
 
-        public VectorCommandSet(VectorCommandType commandType, ResultCache? resultCache = null, IPolicyEngine? policyEngine = null, IMetricsCollector? metrics = null, LshService? lshService = null, ITenantQuotaEnforcer? quotaEnforcer = null)
+        public VectorCommandSet(
+            VectorCommandType commandType,
+            ResultCache? resultCache = null,
+            IPolicyEngine? policyEngine = null,
+            IMetricsCollector? metrics = null,
+            LshService? lshService = null,
+            ITenantQuotaEnforcer? quotaEnforcer = null,
+            ITenantAuthenticator? tenantAuthenticator = null,
+            ISloGuardrails? sloGuardrails = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
@@ -41,6 +52,8 @@ namespace Pyrope.GarnetServer.Extensions
             _metrics = metrics;
             _lshService = lshService;
             _quotaEnforcer = quotaEnforcer;
+            _tenantAuthenticator = tenantAuthenticator;
+            _sloGuardrails = sloGuardrails;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -64,12 +77,33 @@ namespace Pyrope.GarnetServer.Extensions
                 return true;
             }
 
+            var tenantId = System.Text.Encoding.UTF8.GetString(key);
+
             // --- STATS COMMAND ---
             if (_commandType == VectorCommandType.Stats)
             {
                 if (_metrics == null)
                 {
                     output.WriteError("ERR Metrics collector not configured.");
+                    return true;
+                }
+                try
+                {
+                    var args = ReadArgs(ref input);
+                    if (!TryParseApiKeyOnly(args, out var apiKey, out var parseError))
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.Auth, parseError);
+                        return true;
+                    }
+
+                    if (!TryAuthenticate(tenantId, apiKey, ref output))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteErrorCode(ref output, $"ERR {ex.Message}");
                     return true;
                 }
                 var stats = _metrics.GetStats();
@@ -80,7 +114,6 @@ namespace Pyrope.GarnetServer.Extensions
             try
             {
                 var totalStart = Stopwatch.GetTimestamp();
-                var tenantId = System.Text.Encoding.UTF8.GetString(key);
                 TenantRequestLease? lease = null;
                 if (_quotaEnforcer != null && !_quotaEnforcer.TryBeginRequest(tenantId, out lease, out var errorCode, out var errorMessage))
                 {
@@ -92,6 +125,10 @@ namespace Pyrope.GarnetServer.Extensions
                 {
                     var args = ReadArgs(ref input);
                     var request = VectorCommandParser.ParseSearch(tenantId, args);
+                    if (!TryAuthenticate(tenantId, request.ApiKey, ref output))
+                    {
+                        return true;
+                    }
                     var traceEnabled = request.Trace;
                     var requestId = request.RequestId;
                     if (traceEnabled && string.IsNullOrWhiteSpace(requestId))
@@ -190,6 +227,18 @@ namespace Pyrope.GarnetServer.Extensions
                             }
                         }
                     }
+
+                    // --- SLO Guardrails: cache-only shedding ---
+                    // - Explicit: CACHE_HINT=force
+                    // - Automatic: low priority tenants when guardrails are degraded
+                    var forceCacheOnly =
+                        request.CacheHint == CacheHint.Force ||
+                        (_sloGuardrails?.ShouldForceCacheOnly(request.TenantId, request.IndexName) ?? false);
+                    if (forceCacheOnly && !cacheHit)
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.Busy, "SLO mode: cache-only.");
+                        return true;
+                    }
                     if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
                     {
                         WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
@@ -203,7 +252,8 @@ namespace Pyrope.GarnetServer.Extensions
                     }
 
                     faissStart = Stopwatch.GetTimestamp();
-                    var rawResults = index.Search(request.Vector, request.TopK);
+                    var searchOptions = _sloGuardrails?.GetSearchOptions(request.TenantId, request.IndexName);
+                    var rawResults = index.Search(request.Vector, request.TopK, searchOptions);
                     faissEnd = Stopwatch.GetTimestamp();
                     var results = new List<SearchHitDto>(rawResults.Count);
                     foreach (var hit in rawResults)
@@ -303,6 +353,10 @@ namespace Pyrope.GarnetServer.Extensions
 
                     var args = ReadArgs(ref input);
                     var request = VectorCommandParser.Parse(tenantId, args);
+                    if (!TryAuthenticate(tenantId, request.ApiKey, ref output))
+                    {
+                        return true;
+                    }
 
                     var record = new VectorRecord(
                         request.TenantId,
@@ -366,14 +420,36 @@ namespace Pyrope.GarnetServer.Extensions
                 return true;
             }
 
-            if (args.Count > 2)
+            var indexName = Decode(args[0]);
+            var id = Decode(args[1]);
+            string? apiKey = null;
+
+            var i = 2;
+            while (i < args.Count)
             {
-                WriteErrorCode(ref output, "ERR Too many arguments for VEC.DEL.");
+                var token = Decode(args[i]);
+                if (token.Equals("API_KEY", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.Auth, "API_KEY requires a value.");
+                        return true;
+                    }
+
+                    apiKey = Decode(args[i]);
+                    i++;
+                    continue;
+                }
+
+                WriteErrorCode(ref output, $"ERR Unknown token '{token}'.");
                 return true;
             }
 
-            var indexName = Decode(args[0]);
-            var id = Decode(args[1]);
+            if (!TryAuthenticate(tenantId, apiKey, ref output))
+            {
+                return true;
+            }
 
             if (IndexRegistry.TryGetIndex(tenantId, indexName, out var index))
             {
@@ -392,6 +468,58 @@ namespace Pyrope.GarnetServer.Extensions
             }
 
             output.WriteSimpleString(VectorErrorCodes.Ok);
+            return true;
+        }
+
+        private bool TryAuthenticate(string tenantId, string? apiKey, ref RespMemoryWriter output)
+        {
+            if (_tenantAuthenticator == null)
+            {
+                WriteErrorCode(ref output, VectorErrorCodes.Auth, "Authenticator not configured.");
+                return false;
+            }
+
+            if (!_tenantAuthenticator.TryAuthenticate(tenantId, apiKey, out var errorMessage))
+            {
+                WriteErrorCode(ref output, VectorErrorCodes.Auth, errorMessage ?? "Unauthorized.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryParseApiKeyOnly(IReadOnlyList<ArgSlice> args, out string? apiKey, out string? error)
+        {
+            apiKey = null;
+            error = null;
+
+            if (args.Count == 0)
+            {
+                error = "API_KEY is required.";
+                return false;
+            }
+
+            // Expect: API_KEY <value>
+            if (args.Count != 2)
+            {
+                error = "Expected: API_KEY <value>";
+                return false;
+            }
+
+            var token = Decode(args[0]);
+            if (!token.Equals("API_KEY", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Expected API_KEY token.";
+                return false;
+            }
+
+            apiKey = Decode(args[1]);
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                error = "API key cannot be empty.";
+                return false;
+            }
+
             return true;
         }
 

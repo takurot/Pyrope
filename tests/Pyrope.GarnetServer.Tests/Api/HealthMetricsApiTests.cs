@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pyrope.GarnetServer;
@@ -9,18 +10,29 @@ namespace Pyrope.GarnetServer.Tests.Api
 {
     public class HealthMetricsApiTests : IClassFixture<WebApplicationFactory<Program>>
     {
+        private const string AdminApiKey = "test-admin-key";
         private readonly HttpClient _client;
 
         public HealthMetricsApiTests(WebApplicationFactory<Program> factory)
         {
             var testFactory = factory.WithWebHostBuilder(builder =>
             {
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new[]
+                    {
+                        new KeyValuePair<string, string?>("Auth:Enabled", "true"),
+                        new KeyValuePair<string, string?>("Auth:AdminApiKey", AdminApiKey)
+                    });
+                });
+
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<Microsoft.Extensions.Hosting.IHostedService>();
                 });
             });
             _client = testFactory.CreateClient();
+            _client.DefaultRequestHeaders.Add("X-API-KEY", AdminApiKey);
         }
 
         [Fact]

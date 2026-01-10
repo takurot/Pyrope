@@ -51,5 +51,17 @@ namespace Pyrope.GarnetServer.Tests.Vector
             var index = new BruteForceVectorIndex(2, VectorMetric.L2);
             Assert.Throws<ArgumentException>(() => index.Add("a", new float[] { 1f }));
         }
+
+        [Fact]
+        public void Search_WithMaxScansZero_ReturnsEmpty()
+        {
+            var index = new BruteForceVectorIndex(2, VectorMetric.InnerProduct);
+            index.Add("a", new float[] { 1f, 0f });
+            index.Add("b", new float[] { 0f, 1f });
+
+            var results = index.Search(new float[] { 1f, 0f }, 1, new SearchOptions(MaxScans: 0));
+
+            Assert.Empty(results);
+        }
     }
 }

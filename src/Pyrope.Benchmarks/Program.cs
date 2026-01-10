@@ -34,10 +34,27 @@ public static class Program
             return 2;
         }
 
+        if (string.IsNullOrWhiteSpace(options.TenantApiKey))
+        {
+            Console.Error.WriteLine("--api-key is required (tenant API key).");
+            return 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.HttpBaseUrl) && string.IsNullOrWhiteSpace(options.AdminApiKey))
+        {
+            Console.Error.WriteLine("--admin-api-key is required when using --http.");
+            return 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.HttpBaseUrl))
+        {
+            await EnsureTenantAsync(options.HttpBaseUrl!, options.AdminApiKey!, options.TenantId, options.TenantApiKey!);
+        }
+
         if (!string.IsNullOrWhiteSpace(options.HttpBaseUrl) &&
             options.CacheMode.Equals("off", StringComparison.OrdinalIgnoreCase))
         {
-            await DisableCacheAsync(options.HttpBaseUrl!, flush: true);
+            await DisableCacheAsync(options.HttpBaseUrl!, options.AdminApiKey!, flush: true);
         }
 
         Console.WriteLine($"[Pyrope.Benchmarks] RESP endpoint: {options.Host}:{options.Port}");
@@ -66,6 +83,7 @@ public static class Program
         var load = await LoadVectorsAsync(
             db,
             options.TenantId,
+            options.TenantApiKey!,
             options.IndexName,
             baseVectors,
             options.Concurrency,
@@ -82,7 +100,7 @@ public static class Program
             for (var i = 0; i < options.Warmup; i++)
             {
                 var q = encodedQueries[i % encodedQueries.Length];
-                db.Execute("VEC.SEARCH", options.TenantId, options.IndexName, "TOPK", options.TopK.ToString(), "VECTOR", q);
+                db.Execute("VEC.SEARCH", options.TenantId, options.IndexName, "TOPK", options.TopK.ToString(), "VECTOR", q, "API_KEY", options.TenantApiKey);
             }
             Console.WriteLine();
         }
@@ -92,6 +110,7 @@ public static class Program
         var benchmark = await BenchmarkSearchAsync(
             db,
             options.TenantId,
+            options.TenantApiKey!,
             options.IndexName,
             options.TopK,
             encodedQueries,
@@ -106,7 +125,7 @@ public static class Program
         {
             try
             {
-                var stats = db.Execute("VEC.STATS", options.TenantId);
+                var stats = db.Execute("VEC.STATS", options.TenantId, "API_KEY", options.TenantApiKey);
                 Console.WriteLine();
                 Console.WriteLine("[Pyrope.Benchmarks] VEC.STATS:");
                 Console.WriteLine(stats.ToString());
@@ -196,6 +215,7 @@ public static class Program
     private static async Task<LoadResult> LoadVectorsAsync(
         IDatabase db,
         string tenantId,
+        string tenantApiKey,
         string indexName,
         IEnumerable<float[]> vectors,
         int concurrency,
@@ -229,7 +249,7 @@ public static class Program
                         ? (RedisValue)VectorEncoding.ToLittleEndianBytes(item.Vector)
                         : (RedisValue)JsonSerializer.Serialize(item.Vector);
 
-                    db.Execute("VEC.UPSERT", tenantId, indexName, id, "VECTOR", payload);
+                    db.Execute("VEC.UPSERT", tenantId, indexName, id, "VECTOR", payload, "API_KEY", tenantApiKey);
 
                     var completed = Interlocked.Increment(ref completedCount);
                     var now = Stopwatch.GetTimestamp();
@@ -274,6 +294,7 @@ public static class Program
     private static async Task<SearchBenchmarkResult> BenchmarkSearchAsync(
         IDatabase db,
         string tenantId,
+        string tenantApiKey,
         string indexName,
         int topK,
         IReadOnlyList<RedisValue> encodedQueries,
@@ -299,7 +320,7 @@ public static class Program
                 {
                     var q = encodedQueries[i];
                     var t0 = Stopwatch.GetTimestamp();
-                    db.Execute("VEC.SEARCH", tenantId, indexName, "TOPK", topK.ToString(), "VECTOR", q);
+                    db.Execute("VEC.SEARCH", tenantId, indexName, "TOPK", topK.ToString(), "VECTOR", q, "API_KEY", tenantApiKey);
                     var t1 = Stopwatch.GetTimestamp();
                     latencies[i] = (t1 - t0) * 1000d / Stopwatch.Frequency;
 
@@ -324,11 +345,12 @@ public static class Program
         return new SearchBenchmarkResult(latencies, startAll.Elapsed, qps);
     }
 
-    private static async Task DisableCacheAsync(string httpBaseUrl, bool flush)
+    private static async Task DisableCacheAsync(string httpBaseUrl, string adminApiKey, bool flush)
     {
         // Expect e.g. http://127.0.0.1:5000
         var baseUri = httpBaseUrl.EndsWith("/", StringComparison.Ordinal) ? httpBaseUrl : httpBaseUrl + "/";
         using var http = new HttpClient { BaseAddress = new Uri(baseUri) };
+        http.DefaultRequestHeaders.Add("X-API-KEY", adminApiKey);
 
         var payload = JsonSerializer.Serialize(new { enableCache = false, defaultTtlSeconds = 0 });
         using var put = new StringContent(payload, TextEncoding.UTF8, "application/json");
@@ -340,6 +362,35 @@ public static class Program
             var postRes = await http.PostAsync("v1/cache/flush", content: null);
             postRes.EnsureSuccessStatusCode();
         }
+    }
+
+    private static async Task EnsureTenantAsync(string httpBaseUrl, string adminApiKey, string tenantId, string tenantApiKey)
+    {
+        var baseUri = httpBaseUrl.EndsWith("/", StringComparison.Ordinal) ? httpBaseUrl : httpBaseUrl + "/";
+        using var http = new HttpClient { BaseAddress = new Uri(baseUri) };
+        http.DefaultRequestHeaders.Add("X-API-KEY", adminApiKey);
+
+        var payload = JsonSerializer.Serialize(new { tenantId = tenantId, apiKey = tenantApiKey });
+        using var post = new StringContent(payload, TextEncoding.UTF8, "application/json");
+
+        // Create if missing; if already exists, that's fine.
+        var res = await http.PostAsync("v1/tenants", post);
+        if (res.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        // If exists, update API key to expected value.
+        if (res.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var putPayload = JsonSerializer.Serialize(new { apiKey = tenantApiKey });
+            using var put = new StringContent(putPayload, TextEncoding.UTF8, "application/json");
+            var putRes = await http.PutAsync($"v1/tenants/{tenantId}/apikey", put);
+            putRes.EnsureSuccessStatusCode();
+            return;
+        }
+
+        res.EnsureSuccessStatusCode();
     }
 
     private static bool TryParseArgs(string[] args, out Options options, out string error)
@@ -392,6 +443,8 @@ public static class Program
         options.CacheMode = map.TryGetValue("--cache", out var cache) && !string.IsNullOrWhiteSpace(cache) ? cache! : options.CacheMode;
         options.IdPrefix = map.TryGetValue("--id-prefix", out var idPrefix) && !string.IsNullOrWhiteSpace(idPrefix) ? idPrefix! : options.IdPrefix;
         options.PrintStats = map.ContainsKey("--print-stats");
+        options.TenantApiKey = map.TryGetValue("--api-key", out var apiKey) ? apiKey : options.TenantApiKey;
+        options.AdminApiKey = map.TryGetValue("--admin-api-key", out var adminKey) ? adminKey : options.AdminApiKey;
 
         var payload = map.TryGetValue("--payload", out var payloadValue) ? payloadValue : null;
         if (!string.IsNullOrWhiteSpace(payload))
@@ -454,6 +507,7 @@ public static class Program
         Console.WriteLine("  --port <port>                 (default: 3278)");
         Console.WriteLine("  --tenant <tenantId>           (default: tenant_bench)");
         Console.WriteLine("  --index <indexName>           (default: idx_bench)");
+        Console.WriteLine("  --api-key <tenantApiKey>      (required) tenant API key for VEC.* commands");
         Console.WriteLine("  --payload <binary|json>       (default: binary)");
         Console.WriteLine("  --base-limit <n>              (default: 100000)");
         Console.WriteLine("  --query-limit <n>             (default: 1000)");
@@ -471,11 +525,12 @@ public static class Program
         Console.WriteLine();
         Console.WriteLine("Cache control (optional, via HTTP Control Plane):");
         Console.WriteLine("  --http <baseUrl>              e.g. http://127.0.0.1:5000");
+        Console.WriteLine("  --admin-api-key <adminKey>    (required with --http) admin API key for /v1/*");
         Console.WriteLine("  --cache <off|on>              (default: off) when off + --http, disables cache and flushes");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  dotnet run --project src/Pyrope.GarnetServer -- --port 3278 --bind 127.0.0.1");
-        Console.WriteLine("  dotnet run --project src/Pyrope.Benchmarks -- --dataset sift --sift-dir ./datasets/sift1m --base-limit 100000 --query-limit 1000");
+        Console.WriteLine("  dotnet run --project src/Pyrope.Benchmarks -- --dataset sift --sift-dir ./datasets/sift1m --base-limit 100000 --query-limit 1000 --api-key <tenantApiKey>");
         Console.WriteLine();
     }
 
@@ -486,6 +541,7 @@ public static class Program
         public string TenantId { get; set; } = "tenant_bench";
         // Use unique index name per run to avoid conflicts with existing data
         public string IndexName { get; set; } = $"idx_bench_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        public string? TenantApiKey { get; set; }
         public string Dataset { get; set; } = "sift";
         public string? SiftDir { get; set; }
         public string? SiftBasePath { get; set; }
@@ -499,6 +555,7 @@ public static class Program
         public int Warmup { get; set; } = 100;
         public bool UseBinaryPayload { get; set; } = true;
         public string? HttpBaseUrl { get; set; }
+        public string? AdminApiKey { get; set; }
         public string CacheMode { get; set; } = "off";
         public string IdPrefix { get; set; } = "v";
         public bool PrintStats { get; set; }

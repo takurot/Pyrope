@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pyrope.GarnetServer;
@@ -15,6 +17,7 @@ namespace Pyrope.GarnetServer.Tests.Api
 {
     public class IndexApiTests : IClassFixture<WebApplicationFactory<Program>>
     {
+        private const string AdminApiKey = "test-admin-key";
         private readonly WebApplicationFactory<Program> _factory;
         private readonly HttpClient _client;
 
@@ -22,6 +25,15 @@ namespace Pyrope.GarnetServer.Tests.Api
         {
             _factory = factory.WithWebHostBuilder(builder =>
             {
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new[]
+                    {
+                        new KeyValuePair<string, string?>("Auth:Enabled", "true"),
+                        new KeyValuePair<string, string?>("Auth:AdminApiKey", AdminApiKey)
+                    });
+                });
+
                 builder.ConfigureServices(services =>
                 {
                     // Safely remove GarnetService to avoid starting Garnet during tests
@@ -29,6 +41,7 @@ namespace Pyrope.GarnetServer.Tests.Api
                 });
             });
             _client = _factory.CreateClient();
+            _client.DefaultRequestHeaders.Add("X-API-KEY", AdminApiKey);
         }
 
         [Fact]
@@ -204,6 +217,14 @@ namespace Pyrope.GarnetServer.Tests.Api
                  new StringContent(JsonSerializer.Serialize(loadReq), Encoding.UTF8, "application/json"));
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task MissingApiKey_ReturnsUnauthorized()
+        {
+            using var client = _factory.CreateClient();
+            var response = await client.GetAsync("/v1/health");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
     }
 }

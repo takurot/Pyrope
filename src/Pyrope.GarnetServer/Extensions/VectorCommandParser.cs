@@ -16,7 +16,8 @@ namespace Pyrope.GarnetServer.Extensions
             float[] vector,
             string? metaJson,
             IReadOnlyList<string> tags,
-            IReadOnlyDictionary<string, double> numericFields)
+            IReadOnlyDictionary<string, double> numericFields,
+            string? apiKey)
         {
             TenantId = tenantId;
             IndexName = indexName;
@@ -25,6 +26,7 @@ namespace Pyrope.GarnetServer.Extensions
             MetaJson = metaJson;
             Tags = tags;
             NumericFields = numericFields;
+            ApiKey = apiKey;
         }
 
         public string TenantId { get; }
@@ -34,6 +36,7 @@ namespace Pyrope.GarnetServer.Extensions
         public string? MetaJson { get; }
         public IReadOnlyList<string> Tags { get; }
         public IReadOnlyDictionary<string, double> NumericFields { get; }
+        public string? ApiKey { get; }
     }
 
     public sealed class VectorSearchRequest
@@ -46,7 +49,9 @@ namespace Pyrope.GarnetServer.Extensions
             IReadOnlyList<string> filterTags,
             bool includeMeta,
             bool trace,
-            string? requestId)
+            string? requestId,
+            string? apiKey,
+            CacheHint cacheHint)
         {
             TenantId = tenantId;
             IndexName = indexName;
@@ -56,6 +61,8 @@ namespace Pyrope.GarnetServer.Extensions
             IncludeMeta = includeMeta;
             Trace = trace;
             RequestId = requestId;
+            ApiKey = apiKey;
+            CacheHint = cacheHint;
         }
 
         public string TenantId { get; }
@@ -66,6 +73,14 @@ namespace Pyrope.GarnetServer.Extensions
         public bool IncludeMeta { get; }
         public bool Trace { get; }
         public string? RequestId { get; }
+        public string? ApiKey { get; }
+        public CacheHint CacheHint { get; }
+    }
+
+    public enum CacheHint
+    {
+        Default = 0,
+        Force = 1
     }
 
     public static class VectorCommandParser
@@ -93,6 +108,7 @@ namespace Pyrope.GarnetServer.Extensions
             string? metaJson = null;
             var tags = Array.Empty<string>();
             var numericFields = new Dictionary<string, double>(StringComparer.Ordinal);
+            string? apiKey = null;
 
             var i = 5;
             while (i < args.Count)
@@ -134,10 +150,22 @@ namespace Pyrope.GarnetServer.Extensions
                     continue;
                 }
 
+                if (token.Equals("API_KEY", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        throw new ArgumentException("API_KEY requires a value.");
+                    }
+                    apiKey = args[i];
+                    i++;
+                    continue;
+                }
+
                 throw new ArgumentException($"Unknown token '{token}'.");
             }
 
-            return new VectorCommandRequest(tenantId, indexName, id, vector, metaJson, tags, numericFields);
+            return new VectorCommandRequest(tenantId, indexName, id, vector, metaJson, tags, numericFields, apiKey);
         }
 
         public static VectorCommandRequest Parse(string tenantId, IReadOnlyList<ArgSlice> args)
@@ -162,6 +190,7 @@ namespace Pyrope.GarnetServer.Extensions
             string? metaJson = null;
             var tags = Array.Empty<string>();
             var numericFields = new Dictionary<string, double>(StringComparer.Ordinal);
+            string? apiKey = null;
 
             var i = 4;
             while (i < args.Count)
@@ -203,10 +232,22 @@ namespace Pyrope.GarnetServer.Extensions
                     continue;
                 }
 
+                if (token.Equals("API_KEY", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        throw new ArgumentException("API_KEY requires a value.");
+                    }
+                    apiKey = Decode(args[i]);
+                    i++;
+                    continue;
+                }
+
                 throw new ArgumentException($"Unknown token '{token}'.");
             }
 
-            return new VectorCommandRequest(tenantId, indexName, id, vector, metaJson, tags, numericFields);
+            return new VectorCommandRequest(tenantId, indexName, id, vector, metaJson, tags, numericFields, apiKey);
         }
 
         public static VectorSearchRequest ParseSearch(string tenantId, IReadOnlyList<ArgSlice> args)
@@ -242,6 +283,8 @@ namespace Pyrope.GarnetServer.Extensions
             var includeMeta = false;
             var trace = false;
             string? requestId = null;
+            string? apiKey = null;
+            var cacheHint = CacheHint.Default;
 
             var i = 5;
             while (i < args.Count)
@@ -285,10 +328,42 @@ namespace Pyrope.GarnetServer.Extensions
                     continue;
                 }
 
+                if (token.Equals("CACHE_HINT", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        throw new ArgumentException("CACHE_HINT requires a value.");
+                    }
+                    var value = Decode(args[i]);
+                    if (value.Equals("force", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cacheHint = CacheHint.Force;
+                    }
+                    else
+                    {
+                        throw new ArgumentException("CACHE_HINT must be 'force'.");
+                    }
+                    i++;
+                    continue;
+                }
+
+                if (token.Equals("API_KEY", StringComparison.OrdinalIgnoreCase))
+                {
+                    i++;
+                    if (i >= args.Count)
+                    {
+                        throw new ArgumentException("API_KEY requires a value.");
+                    }
+                    apiKey = Decode(args[i]);
+                    i++;
+                    continue;
+                }
+
                 throw new ArgumentException($"Unknown token '{token}'.");
             }
 
-            return new VectorSearchRequest(tenantId, indexName, topK, vector, filterTags, includeMeta, trace, requestId);
+            return new VectorSearchRequest(tenantId, indexName, topK, vector, filterTags, includeMeta, trace, requestId, apiKey, cacheHint);
         }
 
         private static string ValidateJson(string json)

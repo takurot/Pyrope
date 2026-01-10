@@ -5,12 +5,23 @@ services:
       dockerfile: src/Pyrope.GarnetServer/Dockerfile
     ports:
       - "3278:3278"
+      - "5000:5000"
     depends_on:
       - sidecar
     environment:
-      - PYROPE_SIDECAR_ENDPOINT=http://sidecar:50051
+      # --- HTTP Auth (Control Plane) ---
+      - PYROPE_ADMIN_API_KEY=dev-admin-key
+
+      # --- Sidecar mTLS (gRPC) ---
+      - PYROPE_SIDECAR_ENDPOINT=https://sidecar:50051
+      - PYROPE_SIDECAR_MTLS_ENABLED=true
+      - PYROPE_SIDECAR_CA_CERT_PEM=/certs/ca/ca.crt
+      - PYROPE_SIDECAR_CLIENT_CERT_PEM=/certs/garnet/client.crt
+      - PYROPE_SIDECAR_CLIENT_KEY_PEM=/certs/garnet/client.key
     networks:
       - pyrope-net
+    volumes:
+      - ./.certs:/certs:ro
 
   sidecar:
     build:
@@ -18,8 +29,16 @@ services:
       dockerfile: src/Pyrope.AISidecar/Dockerfile
     ports:
       - "50051:50051"
+    environment:
+      - PYROPE_SIDECAR_MTLS_ENABLED=true
+      - PYROPE_SIDECAR_PORT=50051
+      - PYROPE_SIDECAR_CA_CERT_PEM=/certs/ca/ca.crt
+      - PYROPE_SIDECAR_CERT_PEM=/certs/sidecar/server.crt
+      - PYROPE_SIDECAR_KEY_PEM=/certs/sidecar/server.key
     networks:
       - pyrope-net
+    volumes:
+      - ./.certs:/certs:ro
 
 networks:
   pyrope-net:

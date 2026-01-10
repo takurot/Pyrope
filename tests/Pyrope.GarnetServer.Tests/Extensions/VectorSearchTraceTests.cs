@@ -3,6 +3,8 @@ using Garnet;
 using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
+using Pyrope.GarnetServer.Security;
+using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
@@ -10,6 +12,9 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 {
     public class VectorSearchTraceTests : IDisposable
     {
+        private const string TenantApiKey = "test-tenant-key";
+        private readonly TenantRegistry _tenantRegistry = new();
+        private readonly ITenantAuthenticator _tenantAuthenticator;
         private readonly Garnet.GarnetServer _server;
         private readonly int _port;
 
@@ -19,20 +24,22 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var cacheStorage = new MemoryCacheStorage();
             var resultCache = new ResultCache(cacheStorage, VectorCommandSet.SharedIndexRegistry);
             var policyEngine = new StaticPolicyEngine(TimeSpan.FromSeconds(60));
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantRegistry.TryCreate("t_trace", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             try
             {
                 _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
-                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
                 _server.Start();
             }
             catch
             {
                 _port = 4500 + new Random().Next(1000);
                 _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
-                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
                 _server.Start();
             }
         }
@@ -47,9 +54,9 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         {
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
-            db.Execute("VEC.ADD", "t_trace", "i_trace", "d1", "VECTOR", "[1,0]");
+            db.Execute("VEC.ADD", "t_trace", "i_trace", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
-            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_trace", "i_trace", "TOPK", "1", "VECTOR", "[1,0]", "TRACE", "REQUEST_ID", "req-1");
+            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_trace", "i_trace", "TOPK", "1", "VECTOR", "[1,0]", "TRACE", "REQUEST_ID", "req-1", "API_KEY", TenantApiKey);
 
             Assert.NotNull(result);
             Assert.Equal(2, result!.Length);

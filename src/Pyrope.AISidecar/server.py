@@ -1,6 +1,7 @@
 import grpc
 from concurrent import futures
 import time
+import os
 
 # These imports will work after running codegen.py
 import policy_service_pb2
@@ -58,16 +59,55 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             "ttl_seconds": policy_config.ttl_seconds,
             "eviction_priority": policy_config.eviction_priority,
         }
-        self._logger.log_decision(request.tenant_id, query_features, system_metrics, decision)
+        tenant_id = getattr(request, "tenant_id", "system")
+        self._logger.log_decision(tenant_id, query_features, system_metrics, decision)
 
         return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
 
 
+def _read_file_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def _parse_bool_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _configure_ports(server: grpc.Server, port: int) -> None:
+    mtls_enabled = _parse_bool_env("PYROPE_SIDECAR_MTLS_ENABLED", default=False)
+
+    if not mtls_enabled:
+        server.add_insecure_port(f"[::]:{port}")
+        return
+
+    cert_pem = os.getenv("PYROPE_SIDECAR_CERT_PEM")
+    key_pem = os.getenv("PYROPE_SIDECAR_KEY_PEM")
+    ca_pem = os.getenv("PYROPE_SIDECAR_CA_CERT_PEM")
+    if not cert_pem or not key_pem or not ca_pem:
+        raise ValueError("mTLS enabled but PYROPE_SIDECAR_CERT_PEM/KEY_PEM/CA_CERT_PEM are not configured")
+
+    server_cert_chain = _read_file_bytes(cert_pem)
+    server_private_key = _read_file_bytes(key_pem)
+    root_certificates = _read_file_bytes(ca_pem)
+
+    creds = grpc.ssl_server_credentials(
+        [(server_private_key, server_cert_chain)],
+        root_certificates=root_certificates,
+        require_client_auth=True,
+    )
+    server.add_secure_port(f"[::]:{port}", creds)
+
+
 def serve():
+    port = int(os.getenv("PYROPE_SIDECAR_PORT", "50051"))
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(PolicyService(), server)
-    server.add_insecure_port("[::]:50051")
-    print("Starting AI Sidecar server on port 50051...")
+    _configure_ports(server, port)
+    print(f"Starting AI Sidecar server on port {port} (mTLS={'on' if _parse_bool_env('PYROPE_SIDECAR_MTLS_ENABLED') else 'off'})...")
     server.start()
     try:
         while True:

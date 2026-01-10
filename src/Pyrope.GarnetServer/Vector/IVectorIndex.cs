@@ -19,7 +19,7 @@ namespace Pyrope.GarnetServer.Vector
         void Add(string id, float[] vector);
         void Upsert(string id, float[] vector);
         bool Delete(string id);
-        IReadOnlyList<SearchResult> Search(float[] query, int topK);
+        IReadOnlyList<SearchResult> Search(float[] query, int topK, SearchOptions? options = null);
 
         // Management
         void Build();

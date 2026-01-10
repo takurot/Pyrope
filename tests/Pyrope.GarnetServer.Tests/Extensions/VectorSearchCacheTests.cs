@@ -4,6 +4,8 @@ using Garnet;
 using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
+using Pyrope.GarnetServer.Security;
+using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
@@ -11,6 +13,9 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 {
     public class VectorSearchCacheTests : IDisposable
     {
+        private const string TenantApiKey = "test-tenant-key";
+        private readonly TenantRegistry _tenantRegistry = new();
+        private readonly ITenantAuthenticator _tenantAuthenticator;
         private readonly Garnet.GarnetServer _server;
         private readonly int _port;
         private readonly MemoryCacheStorage _cacheStorage;
@@ -19,6 +24,12 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         {
             _port = 4000 + new Random().Next(1000);
             _cacheStorage = new MemoryCacheStorage();
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+
+            EnsureTenant("t_cache1");
+            EnsureTenant("t_cache2");
+            EnsureTenant("t_cache3");
+            EnsureTenant("t_ttl");
 
             // Shared components
             var indexRegistry = VectorCommandSet.SharedIndexRegistry;
@@ -30,10 +41,10 @@ namespace Pyrope.GarnetServer.Tests.Extensions
                 _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
 
                 // Register Write Commands (Standard)
-                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
 
                 // Register Search Command (With Cache)
-                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
                 _server.Start();
             }
@@ -43,8 +54,8 @@ namespace Pyrope.GarnetServer.Tests.Extensions
                 _port = 4000 + new Random().Next(1000);
                 _server = new Garnet.GarnetServer(new string[] { "--port", _port.ToString(), "--bind", "127.0.0.1" });
 
-                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+                _server.Register.NewCommand("VEC.ADD", Garnet.server.CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+                _server.Register.NewCommand("VEC.SEARCH", Garnet.server.CommandType.Read, new VectorCommandSet(VectorCommandType.Search, resultCache, policyEngine, tenantAuthenticator: _tenantAuthenticator), new Garnet.server.RespCommandsInfo { Command = (Garnet.server.RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
                 _server.Start();
             }
@@ -62,10 +73,10 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var db = redis.GetDatabase();
 
             // 1. Seed data
-            db.Execute("VEC.ADD", "t_cache1", "i_cache1", "d1", "VECTOR", "[1,0]");
+            db.Execute("VEC.ADD", "t_cache1", "i_cache1", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 2. Search (Miss -> Compute -> Cache)
-            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache1", "i_cache1", "TOPK", "1", "VECTOR", "[1,0]");
+            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache1", "i_cache1", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
             Assert.NotNull(result);
             Assert.Single(result!);
 
@@ -81,10 +92,10 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var db = redis.GetDatabase();
 
             // 1. Seed data
-            db.Execute("VEC.ADD", "t_cache2", "i_cache2", "d1", "VECTOR", "[1,0]");
+            db.Execute("VEC.ADD", "t_cache2", "i_cache2", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 2. Search (Populate Cache)
-            var result1 = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache2", "i_cache2", "TOPK", "1", "VECTOR", "[1,0]");
+            var result1 = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache2", "i_cache2", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
             Assert.Equal("d1", ((RedisResult[]?)result1![0])![0].ToString());
 
             // 3. Delete data (Bypass Garnet Command)
@@ -95,7 +106,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             }
 
             // 4. Search again
-            var result2 = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache2", "i_cache2", "TOPK", "1", "VECTOR", "[1,0]");
+            var result2 = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache2", "i_cache2", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // If Cached: Should still return "d1".
             Assert.NotNull(result2);
@@ -110,13 +121,13 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var db = redis.GetDatabase();
 
             // 1. Seed
-            db.Execute("VEC.ADD", "t_cache3", "i_cache3", "d1", "VECTOR", "[1,0]");
+            db.Execute("VEC.ADD", "t_cache3", "i_cache3", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 2. Cache
-            db.Execute("VEC.SEARCH", "t_cache3", "i_cache3", "TOPK", "1", "VECTOR", "[1,0]");
+            db.Execute("VEC.SEARCH", "t_cache3", "i_cache3", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 3. Add new doc -> Increments Epoch
-            db.Execute("VEC.ADD", "t_cache3", "i_cache3", "d2", "VECTOR", "[0,1]");
+            db.Execute("VEC.ADD", "t_cache3", "i_cache3", "d2", "VECTOR", "[0,1]", "API_KEY", TenantApiKey);
 
             // 4. Hack: Delete d1 directly from Index (Backdoor)
             var registry = VectorCommandSet.SharedIndexRegistry;
@@ -128,7 +139,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             // Manually increment epoch to simulate "Some update happened" if VEC.ADD didn't do enough?
             // VEC.ADD already increments epoch. So cache should be invalidated.
 
-            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache3", "i_cache3", "TOPK", "5", "VECTOR", "[1,0]");
+            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_cache3", "i_cache3", "TOPK", "5", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // Should properly search Index. 
             // Index has d1 deleted, d2 exists.
@@ -149,10 +160,10 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var db = redis.GetDatabase();
 
             // 1. Seed
-            db.Execute("VEC.ADD", "t_ttl", "i_ttl", "d1", "VECTOR", "[1,0]");
+            db.Execute("VEC.ADD", "t_ttl", "i_ttl", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 2. Cache (1s TTL)
-            db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]");
+            db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
 
             // 3. Backdoor delete
             var registry = VectorCommandSet.SharedIndexRegistry;
@@ -160,16 +171,21 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             index!.Delete("d1");
 
             // 4. Immediate check -> Should still be cached (Hit)
-            var hitResult = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]");
+            var hitResult = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
             Assert.Equal("d1", ((RedisResult[]?)hitResult![0])![0].ToString());
 
             // 5. Wait 1.1s
             Thread.Sleep(1200);
 
             // 6. Check -> Should be expired (Miss -> Compute -> Empty)
-            var missResult = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]");
+            var missResult = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_ttl", "i_ttl", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
             // Should be empty array
             Assert.Empty(missResult!);
+        }
+
+        private void EnsureTenant(string tenantId)
+        {
+            _tenantRegistry.TryCreate(tenantId, new TenantQuota(), out _, apiKey: TenantApiKey);
         }
     }
 }

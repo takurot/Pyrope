@@ -151,12 +151,18 @@ namespace Pyrope.GarnetServer.Vector
             }
         }
 
-        public IReadOnlyList<SearchResult> Search(float[] query, int topK)
+        public IReadOnlyList<SearchResult> Search(float[] query, int topK, SearchOptions? options = null)
         {
             ValidateVector(query);
             if (topK <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(topK), "topK must be positive.");
+            }
+
+            var maxScans = options?.MaxScans;
+            if (maxScans.HasValue && maxScans.Value <= 0)
+            {
+                return Array.Empty<SearchResult>();
             }
 
             _lock.EnterReadLock();
@@ -167,17 +173,43 @@ namespace Pyrope.GarnetServer.Vector
                     return Array.Empty<SearchResult>();
                 }
 
-                var scores = new List<SearchResult>(_entries.Count);
-                foreach (var entry in _entries)
+                var scanLimit = maxScans.HasValue ? Math.Min(maxScans.Value, _entries.Count) : _entries.Count;
+                if (scanLimit <= 0)
                 {
-                    var score = ComputeScore(query, entry.Value);
-                    scores.Add(new SearchResult(entry.Key, score));
+                    return Array.Empty<SearchResult>();
                 }
 
-                return scores
-                    .OrderByDescending(result => result.Score)
-                    .Take(topK)
-                    .ToArray();
+                // Keep topK results in a min-heap: O(N log K)
+                var heap = new PriorityQueue<SearchResult, float>();
+                var scanned = 0;
+                foreach (var entry in _entries)
+                {
+                    if (scanned >= scanLimit)
+                    {
+                        break;
+                    }
+                    scanned++;
+
+                    var score = ComputeScore(query, entry.Value);
+                    heap.Enqueue(new SearchResult(entry.Key, score), score);
+                    if (heap.Count > topK)
+                    {
+                        heap.Dequeue(); // remove smallest score
+                    }
+                }
+
+                if (heap.Count == 0)
+                {
+                    return Array.Empty<SearchResult>();
+                }
+
+                var results = new List<SearchResult>(heap.Count);
+                while (heap.Count > 0)
+                {
+                    results.Add(heap.Dequeue());
+                }
+                results.Sort((a, b) => b.Score.CompareTo(a.Score));
+                return results;
             }
             finally
             {

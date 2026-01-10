@@ -93,9 +93,9 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 |----|-------|------|--------------|--------|
 | **P5-1** | [Core] | **Multi-tenancy Isolation**<br>Enforce `tenant_id` prefix on all keys/indexes. Implement namespace isolation. | P0-5 | [x] |
 | **P5-2** | [Core] | **Tenant Quotas & QoS**<br>Implement QPS limits, concurrent execution limits, cache memory limits per tenant. | P5-1, P3-2 | [x] |
-| **P5-3** | [Core] | **Noisy Neighbor Mitigation**<br>Priority-based scheduling. On P99 breach: degrade low-priority tenant params, tighten admission. | P5-2, P2-5 | [ ] |
-| **P5-4** | [Core] | **SLO Guardrails (Shedding)**<br>If `P99 > Target`, auto-degrade search params (lower nprobe/efSearch). Implement `CACHE_HINT=force` SLO mode. | P2-5 | [ ] |
-| **P5-5** | [Security] | **Authentication**<br>Implement API Key authentication. mTLS for inter-service communication. | P3-1 | [ ] |
+| **P5-3** | [Core] | **Noisy Neighbor Mitigation**<br>Priority-based scheduling. On P99 breach: degrade low-priority tenant params, tighten admission. | P5-2, P2-5 | [x] |
+| **P5-4** | [Core] | **SLO Guardrails (Shedding)**<br>If `P99 > Target`, auto-degrade search params (lower nprobe/efSearch). Implement `CACHE_HINT=force` SLO mode. | P2-5 | [x] |
+| **P5-5** | [Security] | **Authentication**<br>Implement API Key authentication. mTLS for inter-service communication. | P3-1 | [x] |
 | **P5-6** | [Security] | **Authorization (RBAC)**<br>Implement roles: `tenant_admin`, `operator`, `reader`. Per-tenant index/operation permissions. | P5-5 | [ ] |
 | **P5-7** | [Security] | **Audit Logging**<br>Log all management operations: index create/delete, snapshot, policy change, model switch, quota change. | P5-6 | [ ] |
 | **P5-8** | [Ops] | **Load Testing & Tuning**<br>Run heavy concurrent load. Tune GC, thread pool, cache sizes. Validate SLO compliance. | All | [ ] |
@@ -238,6 +238,17 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Added integration test coverage for warm-path timeout fallback and documented `Sidecar:WarmPathTimeoutMs` config.
 - Enforced tenant QPS/concurrency limits on vector commands and added per-tenant cache memory caps.
 - Added `TenantQuotaEnforcer` and `MemoryCacheStorage` quota tests.
+- Implemented **P5-5 Authentication**:
+  - HTTP Control Plane (`/v1/*`) requires `X-API-KEY` (admin key).
+  - RESP (`VEC.*`) requires `API_KEY <tenantApiKey>` token.
+  - Added tenant API key management: `POST /v1/tenants` accepts `apiKey`, plus `PUT /v1/tenants/{tenantId}/apikey`.
+- Implemented **P5-4 SLO Guardrails**:
+  - `CACHE_HINT=force` cache-only mode (shed cache misses).
+  - Automatic degradation when estimated P99 breaches target (BruteForce: `MaxScans` budget via `SearchOptions`).
+- Implemented **P5-3 Noisy Neighbor Mitigation**:
+  - Added tenant `Priority` (0=high, 1=normal, 2=low).
+  - Under degradation: protect high-priority tenants; shed low-priority tenants on cache miss.
+- Added **Sidecar gRPC mTLS** (Garnet↔AISidecar): cert-based secure channel + local cert generation script + docker-compose wiring.
 - Implemented **P1-6 Vector Benchmarking Data & Tool**: added `src/Pyrope.Benchmarks` (SIFT fvecs / GloVe txt loaders, QPS/latency reporting) and `scripts/bench_vectors.sh`.
 
 ## Tests
@@ -254,6 +265,9 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter SidecarMetricsReporterTests`
 - `dotnet test Pyrope.sln` (P5-2)
 - `./scripts/check_quality.sh` (P5-2)
+- `src/Pyrope.AISidecar/venv/bin/python -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"` (P5-5 mTLS)
+- `./scripts/generate_mtls_certs.sh` (P5-5 mTLS local certs)
+- `dotnet run --project src/Pyrope.Benchmarks --configuration Release -- --dataset synthetic --dim 32 --base-limit 5000 --query-limit 1000 --topk 10 --concurrency 4 --warmup 100 --payload binary --host 127.0.0.1 --port 6380 --tenant tenant_bench --index idx_bench --api-key <tenantApiKey> --http http://127.0.0.1:5000 --admin-api-key <adminApiKey> --cache off --print-stats` (P5-3/4/5)
 - `dotnet test Pyrope.sln --configuration Release` (P1-6)
 - `./scripts/check_quality.sh` (P1-6)
 

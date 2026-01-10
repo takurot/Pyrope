@@ -30,7 +30,7 @@ namespace Pyrope.GarnetServer.Controllers
             }
 
             var quotas = request.Quotas ?? new TenantQuota();
-            if (_registry.TryCreate(request.TenantId, quotas, out var config))
+            if (_registry.TryCreate(request.TenantId, quotas, out var config, apiKey: request.ApiKey))
             {
                 return Created($"/v1/tenants/{request.TenantId}", new { config!.TenantId });
             }
@@ -74,11 +74,38 @@ namespace Pyrope.GarnetServer.Controllers
 
             return NotFound("Tenant not found.");
         }
+
+        [HttpPut("{tenantId}/apikey")]
+        public IActionResult UpdateApiKey(string tenantId, [FromBody] UpdateTenantApiKeyRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.ApiKey))
+            {
+                return BadRequest("ApiKey is required.");
+            }
+
+            if (!TenantNamespace.TryValidateTenantId(tenantId, out var error))
+            {
+                return BadRequest(error);
+            }
+
+            if (_registry.TryUpdateApiKey(tenantId, request.ApiKey, out _))
+            {
+                return Ok(new { TenantId = tenantId });
+            }
+
+            return NotFound("Tenant not found.");
+        }
     }
 
     public sealed class CreateTenantRequest
     {
         public string TenantId { get; set; } = "";
         public TenantQuota? Quotas { get; set; }
+        public string? ApiKey { get; set; }
+    }
+
+    public sealed class UpdateTenantApiKeyRequest
+    {
+        public string ApiKey { get; set; } = "";
     }
 }
