@@ -174,6 +174,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P10-3** | [Core] | **Partial Caching (L2/L3)**<br>Route cache (QueryKey→nprobe/efSearch recommendation), Cluster cache (QueryKey→IVF cluster candidates), Meta cache (id→meta snippet). | P6-2 | [ ] |
 | **P10-4** | [Core] | **Strong Consistency Mode**<br>Optional strict cache invalidation on writes (Enterprise). | P2-4 | [ ] |
 | **P10-5** | [Ops] | **Multi-Region DR**<br>Cross-region replication for disaster recovery. | P9-2 | [ ] |
+| **P10-6** | [Core] | **Quota Persistence**<br>Persist tenant quota usage (QPS windows, daily request limits) to survive server restarts. Currently in-memory only. | P5-2 | [ ] |
+| **P10-7** | [Security] | **Admin Key Storage (Secret Store)**<br>Support secret stores (Docker secrets, Kubernetes secrets, HashiCorp Vault) or file-based secrets for admin API keys instead of environment variables. | P5-5 | [ ] |
 
 ---
 
