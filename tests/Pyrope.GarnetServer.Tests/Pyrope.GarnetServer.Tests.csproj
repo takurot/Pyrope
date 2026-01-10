@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Pyrope.GarnetServer\Pyrope.GarnetServer.csproj" />
+    <ProjectReference Include="..\..\src\Pyrope.Benchmarks\Pyrope.Benchmarks.csproj" />
   </ItemGroup>
 
 </Project>
