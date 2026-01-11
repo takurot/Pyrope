@@ -67,7 +67,7 @@ namespace Pyrope.GarnetServer.Tests
             // VEC.ADD tenant index id VECTOR <json> META <json>
             // For now, we just check if it accepts the command and returns a stub/OK
             // Since the components aren't registered yet, this should fail with "unknown command"
-            var result = db.Execute("VEC.ADD", "tenant1", "idx1", "doc1", "VECTOR", "[1,2]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey);
+            var result = db.Execute("VEC.ADD", "tenant1", "idx1", "doc1", "VECTOR", "[1,2]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey + "-tenant1");
 
             Assert.Equal("VEC_OK", result.ToString());
         }
@@ -78,12 +78,12 @@ namespace Pyrope.GarnetServer.Tests
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            var addOne = db.Execute("VEC.ADD", "tenant_search1", "idx_search1", "doc1", "VECTOR", "[1,0]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey);
+            var addOne = db.Execute("VEC.ADD", "tenant_search1", "idx_search1", "doc1", "VECTOR", "[1,0]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey + "-tenant_search1");
             Assert.Equal("VEC_OK", addOne.ToString());
-            var addTwo = db.Execute("VEC.ADD", "tenant_search1", "idx_search1", "doc2", "VECTOR", "[0,1]", "TAGS", "sports", "API_KEY", TenantApiKey);
+            var addTwo = db.Execute("VEC.ADD", "tenant_search1", "idx_search1", "doc2", "VECTOR", "[0,1]", "TAGS", "sports", "API_KEY", TenantApiKey + "-tenant_search1");
             Assert.Equal("VEC_OK", addTwo.ToString());
 
-            var rawResult = db.Execute("VEC.SEARCH", "tenant_search1", "idx_search1", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
+            var rawResult = db.Execute("VEC.SEARCH", "tenant_search1", "idx_search1", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey + "-tenant_search1");
             var result = (RedisResult[]?)rawResult;
             Assert.NotNull(result);
             Assert.Single(result!);
@@ -99,12 +99,12 @@ namespace Pyrope.GarnetServer.Tests
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            var addOne = db.Execute("VEC.ADD", "tenant3", "idx3", "doc1", "VECTOR", "[1,0]", "TAGS", "[\"news\",\"sports\"]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey);
+            var addOne = db.Execute("VEC.ADD", "tenant3", "idx3", "doc1", "VECTOR", "[1,0]", "TAGS", "[\"news\",\"sports\"]", "META", "{\"category\":\"news\"}", "API_KEY", TenantApiKey + "-tenant3");
             Assert.Equal("VEC_OK", addOne.ToString());
-            var addTwo = db.Execute("VEC.ADD", "tenant3", "idx3", "doc2", "VECTOR", "[0,1]", "TAGS", "sports", "API_KEY", TenantApiKey);
+            var addTwo = db.Execute("VEC.ADD", "tenant3", "idx3", "doc2", "VECTOR", "[0,1]", "TAGS", "sports", "API_KEY", TenantApiKey + "-tenant3");
             Assert.Equal("VEC_OK", addTwo.ToString());
 
-            var rawResult = db.Execute("VEC.SEARCH", "tenant3", "idx3", "TOPK", "5", "VECTOR", "[1,0]", "FILTER", "news", "WITH_META", "API_KEY", TenantApiKey);
+            var rawResult = db.Execute("VEC.SEARCH", "tenant3", "idx3", "TOPK", "5", "VECTOR", "[1,0]", "FILTER", "news", "WITH_META", "API_KEY", TenantApiKey + "-tenant3");
             var result = (RedisResult[]?)rawResult;
             Assert.NotNull(result);
             Assert.Single(result!);
@@ -122,14 +122,14 @@ namespace Pyrope.GarnetServer.Tests
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            var addResult = db.Execute("VEC.ADD", "tenant2", "idx2", "doc2", "VECTOR", "[1,2]", "API_KEY", TenantApiKey);
+            var addResult = db.Execute("VEC.ADD", "tenant2", "idx2", "doc2", "VECTOR", "[1,2]", "API_KEY", TenantApiKey + "-tenant2");
             Assert.Equal("VEC_OK", addResult.ToString());
 
-            var delResult = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2", "API_KEY", TenantApiKey);
+            var delResult = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2", "API_KEY", TenantApiKey + "-tenant2");
 
             Assert.Equal("VEC_OK", delResult.ToString());
 
-            var secondDelete = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2", "API_KEY", TenantApiKey);
+            var secondDelete = db.Execute("VEC.DEL", "tenant2", "idx2", "doc2", "API_KEY", TenantApiKey + "-tenant2");
             Assert.Equal("VEC_OK", secondDelete.ToString());
         }
 
@@ -139,11 +139,11 @@ namespace Pyrope.GarnetServer.Tests
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            var addResult = db.Execute("VEC.ADD", "tenant_dim", "idx_dim", "doc1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey);
+            var addResult = db.Execute("VEC.ADD", "tenant_dim", "idx_dim", "doc1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey + "-tenant_dim");
             Assert.Equal("VEC_OK", addResult.ToString());
 
             AssertServerErrorContains(() =>
-                db.Execute("VEC.ADD", "tenant_dim", "idx_dim", "doc2", "VECTOR", "[1,2,3]", "API_KEY", TenantApiKey),
+                db.Execute("VEC.ADD", "tenant_dim", "idx_dim", "doc2", "VECTOR", "[1,2,3]", "API_KEY", TenantApiKey + "-tenant_dim"),
                 "VEC_ERR_DIM");
         }
 
@@ -153,11 +153,11 @@ namespace Pyrope.GarnetServer.Tests
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            var seed = db.Execute("VEC.ADD", "tenant_missing", "idx_existing", "doc1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey);
+            var seed = db.Execute("VEC.ADD", "tenant_missing", "idx_existing", "doc1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey + "-tenant_missing");
             Assert.Equal("VEC_OK", seed.ToString());
 
             AssertServerErrorContains(() =>
-                db.Execute("VEC.SEARCH", "tenant_missing", "idx_missing", "TOPK", "1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey),
+                db.Execute("VEC.SEARCH", "tenant_missing", "idx_missing", "TOPK", "1", "VECTOR", "[1,2]", "API_KEY", TenantApiKey + "-tenant_missing"),
                 "VEC_ERR_NOT_FOUND");
         }
 
@@ -174,7 +174,9 @@ namespace Pyrope.GarnetServer.Tests
 
         private void EnsureTenant(string tenantId)
         {
-            _tenantRegistry.TryCreate(tenantId, new TenantQuota(), out _, apiKey: TenantApiKey);
+            // Use unique API keys for each tenant in tests to satisfy the new global uniqueness constraint
+            var apiKey = $"{TenantApiKey}-{tenantId}";
+            _tenantRegistry.TryCreate(tenantId, new TenantQuota(), out _, apiKey: apiKey);
         }
 
         private static void AssertServerErrorContains(Func<RedisResult> action, string expected)

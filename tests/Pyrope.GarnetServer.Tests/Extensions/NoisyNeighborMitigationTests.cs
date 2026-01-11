@@ -21,8 +21,10 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
         public NoisyNeighborMitigationTests()
         {
-            _registry.TryCreate("t_high", new TenantQuota { Priority = 0 }, out _, apiKey: ApiKey);
-            _registry.TryCreate("t_low", new TenantQuota { Priority = 2 }, out _, apiKey: ApiKey);
+            var highKey = ApiKey + "-high";
+            var lowKey = ApiKey + "-low";
+            _registry.TryCreate("t_high", new TenantQuota { Priority = 0 }, out _, apiKey: highKey);
+            _registry.TryCreate("t_low", new TenantQuota { Priority = 2 }, out _, apiKey: lowKey);
             _auth = new TenantApiKeyAuthenticator(_registry);
 
             var options = Options.Create(new SloGuardrailsOptions
@@ -60,20 +62,22 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         [Fact]
         public void LowPriorityTenant_IsShed_WhenDegraded_AndCacheMiss()
         {
+            var highKey = ApiKey + "-high";
+            var lowKey = ApiKey + "-low";
             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
 
-            db.Execute("VEC.ADD", "t_high", "i_nn", "d1", "VECTOR", "[1,0]", "API_KEY", ApiKey);
-            db.Execute("VEC.ADD", "t_low", "i_nn", "d1", "VECTOR", "[1,0]", "API_KEY", ApiKey);
+            db.Execute("VEC.ADD", "t_high", "i_nn", "d1", "VECTOR", "[1,0]", "API_KEY", highKey);
+            db.Execute("VEC.ADD", "t_low", "i_nn", "d1", "VECTOR", "[1,0]", "API_KEY", lowKey);
 
             // High priority proceeds normally.
-            var ok = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_high", "i_nn", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", ApiKey);
+            var ok = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_high", "i_nn", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", highKey);
             Assert.NotNull(ok);
             Assert.Single(ok!);
 
             // Low priority is shed (cache-only mode), since caching isn't configured => miss.
             AssertServerErrorContains(() =>
-                db.Execute("VEC.SEARCH", "t_low", "i_nn", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", ApiKey),
+                db.Execute("VEC.SEARCH", "t_low", "i_nn", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", lowKey),
                 "VEC_ERR_BUSY");
         }
 

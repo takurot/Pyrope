@@ -11,9 +11,9 @@ namespace Pyrope.GarnetServer.Tests.Services
         public void UpdateLatencyP99_TransitionsDegradedState_WithHysteresis()
         {
             var registry = new TenantRegistry();
-            registry.TryCreate("t_high", new TenantQuota { Priority = 0 }, out _, apiKey: "k");
-            registry.TryCreate("t_normal", new TenantQuota { Priority = 1 }, out _, apiKey: "k");
-            registry.TryCreate("t_low", new TenantQuota { Priority = 2 }, out _, apiKey: "k");
+            registry.TryCreate("t_high", new TenantQuota { Priority = 0 }, out _, apiKey: "k1");
+            registry.TryCreate("t_normal", new TenantQuota { Priority = 1 }, out _, apiKey: "k2");
+            registry.TryCreate("t_low", new TenantQuota { Priority = 2 }, out _, apiKey: "k3");
 
             var options = Options.Create(new SloGuardrailsOptions
             {
