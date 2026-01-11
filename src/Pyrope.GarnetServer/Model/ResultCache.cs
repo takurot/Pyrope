@@ -107,6 +107,7 @@ namespace Pyrope.GarnetServer.Model
             public VectorMetric Metric { get; set; }
             public List<string> FilterTags { get; set; } = new();
             public long? SimHash { get; set; }
+            public int? ClusterId { get; set; }
 
             public static CachedQueryKeyDto FromQueryKey(QueryKey key)
             {
@@ -118,13 +119,14 @@ namespace Pyrope.GarnetServer.Model
                     TopK = key.TopK,
                     Metric = key.Metric,
                     FilterTags = new List<string>(key.FilterTags),
-                    SimHash = key.SimHash
+                    SimHash = key.SimHash,
+                    ClusterId = key.ClusterId
                 };
             }
 
             public QueryKey ToQueryKey()
             {
-                return new QueryKey(TenantId, IndexName, Vector, TopK, Metric, FilterTags, SimHash);
+                return new QueryKey(TenantId, IndexName, Vector, TopK, Metric, FilterTags, SimHash, ClusterId);
             }
         }
     }

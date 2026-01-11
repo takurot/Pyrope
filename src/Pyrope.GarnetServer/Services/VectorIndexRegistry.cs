@@ -80,7 +80,10 @@ namespace Pyrope.GarnetServer.Services
             {
                 Dimension = dimension;
                 Metric = metric;
-                Index = new BruteForceVectorIndex(dimension, metric);
+                // Use DeltaVectorIndex by default to exercise the new path
+                var head = new BruteForceVectorIndex(dimension, metric);
+                var tail = new BruteForceVectorIndex(dimension, metric);
+                Index = new DeltaVectorIndex(head, tail);
             }
 
             public int Dimension { get; }

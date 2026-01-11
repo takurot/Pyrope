@@ -107,11 +107,11 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P6-1** | [Core] | **Delta Indexing (LSM Strategy)**<br>Implement `Head Index` (HNSW/Flat, realtime updates) + `Tail Index` (IVF-PQ, immutable). Background merge task. Search merges Head + Tail results. | P1-2 | [ ] |
-| **P6-2** | [Core] | **Semantic Caching (L2: Cluster-Based)**<br>Cluster query embeddings (128-256 clusters). Cache representative results per cluster. Skip FAISS if similarity > threshold. | P2-6 | [ ] |
-| **P6-3** | [Core] | **Cost-Aware Semantic Cache**<br>Implement Proxy Cost Metric: `nprobe * (avg_cluster_size / total_vectors)`. Adjust cache hit threshold based on query cost—higher cost queries tolerate looser matching. | P6-2 | [ ] |
-| **P6-4** | [ML] | **Predictive Prefetching (FIM)**<br>Implement Frequent Itemset Mining on query logs. Generate "Next Query" prediction table. Store in Garnet KV. | P4-5 | [ ] |
-| **P6-5** | [Core] | **Prefetch Execution**<br>Read "Next Query" table on search completion. Queue background prefetch for predicted queries during idle time. | P6-4 | [ ] |
+| **P6-1** | [Core] | **Delta Indexing (LSM Strategy)**<br>Implement `Head Index` (HNSW/Flat, realtime updates) + `Tail Index` (IVF-PQ, immutable). Background merge task. Search merges Head + Tail results. | P1-2 | [x] |
+| **P6-2** | [Core] | **Semantic Caching (L2: Cluster-Based)**<br>Cluster query embeddings (128-256 clusters). Cache representative results per cluster. Skip FAISS if similarity > threshold. | P2-6 | [x] |
+| **P6-3** | [Core] | **Cost-Aware Semantic Cache**<br>Implement Proxy Cost Metric: `nprobe * (avg_cluster_size / total_vectors)`. Adjust cache hit threshold based on query cost—higher cost queries tolerate looser matching. | P6-2 | [x] |
+| **P6-4** | [ML] | **Predictive Prefetching (FIM)**<br>Implement Frequent Itemset Mining on query logs. Generate "Next Query" prediction table. Store in Garnet KV. | P4-5 | [x] |
+| **P6-5** | [Core] | **Prefetch Execution**<br>Read "Next Query" table on search completion. Queue background prefetch for predicted queries during idle time. | P6-4 | [x] |
 | **P6-6** | [Core] | **Cost-Aware Query Routing**<br>Predict query cost (FAISS time, result size, tenant budget remaining). Auto-adjust nprobe/efSearch/topK when cost exceeds budget. Include adjustment in response (transparency). | P4-2, P5-2 | [ ] |
 | **P6-7** | [Core] | **Semantic TTL**<br>Detect drift (cluster heat from concentrated data additions). Auto-shorten TTL for affected cluster's QueryKeys. | P6-2, P4-4 | [ ] |
 | **P6-8** | [ML] | **LLM Worker (Gemini) Skeleton**<br>Consume async queue. Implement prompt templates for normalization/prefetch/eviction. Parse structured output. Apply head-query/cost filters. | P4-5 | [ ] |

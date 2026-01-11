@@ -1,3 +1,6 @@
 grpcio
 grpcio-tools
 protobuf
+scikit-learn
+numpy
+requests

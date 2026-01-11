@@ -10,6 +10,7 @@ using Pyrope.GarnetServer.Services;
 using Pyrope.GarnetServer.Vector;
 using Pyrope.GarnetServer.Policies;
 using Tsavorite.core;
+using Microsoft.Extensions.Logging;
 
 namespace Pyrope.GarnetServer.Extensions
 {
@@ -35,6 +36,9 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly ITenantQuotaEnforcer? _quotaEnforcer;
         private readonly ITenantAuthenticator? _tenantAuthenticator;
         private readonly ISloGuardrails? _sloGuardrails;
+        private readonly SemanticClusterRegistry? _clusterRegistry;
+        private readonly IPredictivePrefetcher? _prefetcher;
+        private readonly ILogger? _logger;
 
         public VectorCommandSet(
             VectorCommandType commandType,
@@ -44,7 +48,11 @@ namespace Pyrope.GarnetServer.Extensions
             LshService? lshService = null,
             ITenantQuotaEnforcer? quotaEnforcer = null,
             ITenantAuthenticator? tenantAuthenticator = null,
-            ISloGuardrails? sloGuardrails = null)
+            ISloGuardrails? sloGuardrails = null,
+
+            SemanticClusterRegistry? clusterRegistry = null,
+            IPredictivePrefetcher? prefetcher = null,
+            ILogger? logger = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
@@ -54,6 +62,9 @@ namespace Pyrope.GarnetServer.Extensions
             _quotaEnforcer = quotaEnforcer;
             _tenantAuthenticator = tenantAuthenticator;
             _sloGuardrails = sloGuardrails;
+            _clusterRegistry = clusterRegistry;
+            _prefetcher = prefetcher;
+            _logger = logger;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -137,6 +148,20 @@ namespace Pyrope.GarnetServer.Extensions
                     }
 
 
+                    // --- INDEX LOOKUP ---
+                    if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
+                        return true;
+                    }
+                    var metric = index.Metric;
+
+                    if (index.Dimension != request.Vector.Length)
+                    {
+                        WriteErrorCode(ref output, VectorErrorCodes.DimMismatch, "Vector dimension mismatch.");
+                        return true;
+                    }
+
                     // --- CACHE LOOKUP ---
                     QueryKey? queryKey = null;
                     PolicyDecision policyDecision = PolicyDecision.NoCache;
@@ -151,7 +176,8 @@ namespace Pyrope.GarnetServer.Extensions
                     if (_policyEngine != null && _resultCache != null)
                     {
                         policyStart = Stopwatch.GetTimestamp();
-                        queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, VectorMetric.L2, request.FilterTags);
+                        // Use actual index metric
+                        queryKey = new QueryKey(request.TenantId, request.IndexName, request.Vector, request.TopK, metric, request.FilterTags);
                         policyDecision = _policyEngine.Evaluate(queryKey);
                         policyEnd = Stopwatch.GetTimestamp();
 
@@ -191,7 +217,7 @@ namespace Pyrope.GarnetServer.Extensions
                                 {
                                     var simHash = _lshService.GenerateSimHash(request.Vector);
                                     var roundedK = QueryKey.RoundK(request.TopK);
-                                    var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                                    var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, simHash);
 
                                     if (_resultCache.TryGet(l1Key, out var l1Json) && !string.IsNullOrEmpty(l1Json))
                                     {
@@ -221,6 +247,112 @@ namespace Pyrope.GarnetServer.Extensions
                                     // Close L1 check
                                 }
 
+                                // 3. Try L2 (Semantic Cluster)
+                                if (_clusterRegistry != null)
+                                {
+                                    // Use actual index metric for clustering too
+                                    var queryCost = CostCalculator.EstimateSearchCost(index.GetStats(), request.TopK);
+                                    var (clusterId, score) = _clusterRegistry.FindNearestCluster(request.TenantId, request.IndexName, request.Vector, metric);
+                                    
+                                    // P6-4 Predictive Prefetching
+                                    if (_prefetcher != null && clusterId >= 0)
+                                    {
+                                        _prefetcher.RecordInteraction(request.TenantId, request.IndexName, clusterId);
+                                        var nextCluster = _prefetcher.GetPrediction(request.TenantId, request.IndexName, clusterId);
+                                        
+                                        // P6-5 Prefetch Execution
+                                        if (nextCluster >= 0 && _clusterRegistry.TryGetCentroid(request.TenantId, request.IndexName, nextCluster, out var centroid) && centroid != null)
+                                        {
+                                            // Execute prefetch in background fire-and-forget
+                                            var pfTenant = request.TenantId;
+                                            var pfIndex = request.IndexName;
+                                            var pfTopK = QueryKey.RoundK(request.TopK); // Use same K or default? RoundK is safer for cache key matching.
+                                            var pfTags = request.FilterTags;
+                                            // Make local copies for closure
+                                            var pfMetric = metric;
+                                            
+                                            Task.Run(() => 
+                                            {
+                                                try 
+                                                {
+                                                    // Construct QueryKey for the *predicted* cluster
+                                                    // Note: We use the centroid as the vector, and explicitly set the ClusterId.
+                                                    // This ensures that when a user query subsequently maps to this cluster,
+                                                    // it will form a QueryKey with the SAME ClusterId, and thus hit this cache entry.
+                                                    var pfKey = new QueryKey(pfTenant, pfIndex, centroid, pfTopK, pfMetric, pfTags, null, nextCluster);
+                                                    
+                                                    // Check if already in cache to avoid redundant work
+                                                    if (_resultCache.TryGet(pfKey, out _)) return; 
+
+                                                    // Perform Search
+                                                    if (IndexRegistry.TryGetIndex(pfTenant, pfIndex, out var idx))
+                                                    {
+                                                        // Note: We scan the index using the centroid.
+                                                        // This gives us the "best" results for the center of the cluster.
+                                                        var raw = idx.Search(centroid, pfTopK);
+                                                        
+                                                        // Filter & Hydrate
+                                                        var res = new List<SearchHitDto>(raw.Count);
+                                                        foreach (var h in raw)
+                                                        {
+                                                            if (Store.TryGet(pfTenant, pfIndex, h.Id, out var rec) && !rec.Deleted)
+                                                            {
+                                                                if (HasAllTags(rec.Tags, pfTags))
+                                                                {
+                                                                    res.Add(new SearchHitDto { Id = h.Id, Score = h.Score, MetaJson = rec.MetaJson });
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // Store in Cache
+                                                        var pfJson = JsonSerializer.Serialize(res);
+                                                        // Use a default TTL or policy-based? For now, use a reasonable default.
+                                                        // Ideally, we'd use PolicyEngine, but for prefetch we assume high utility.
+                                                        _resultCache.Set(pfKey, pfJson, TimeSpan.FromMinutes(5));
+                                                    }
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    // Swallow background errors to valid crash
+                                                    _logger?.LogWarning(ex, "Background prefetch failed for tenant {TenantId}, index {IndexName}", pfTenant, pfIndex);
+                                                }
+                                            });
+                                        }
+                                    }
+
+                                    if (clusterId >= 0 && IsClusterCloseEnough(score, metric, queryCost))
+                                    {
+                                        var roundedK = QueryKey.RoundK(request.TopK);
+                                        var l2Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, null, clusterId);
+                                        
+                                        if (_resultCache.TryGet(l2Key, out var l2Json) && !string.IsNullOrEmpty(l2Json))
+                                        {
+                                            var l2Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l2Json);
+                                            if (l2Hits != null)
+                                            {
+                                                cacheHit = true;
+                                                cacheEnd = Stopwatch.GetTimestamp();
+                                                var totalEnd = Stopwatch.GetTimestamp();
+                                                var traceJson = traceEnabled
+                                                    ? JsonSerializer.Serialize(new TraceInfo
+                                                    {
+                                                        RequestId = requestId,
+                                                        CacheHit = true,
+                                                        LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
+                                                        PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
+                                                        CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
+                                                        FaissMs = 0
+                                                    })
+                                                    : null;
+                                                WriteResults(ref output, l2Hits, request.IncludeMeta, traceJson);
+                                                _metrics?.RecordCacheHit(); 
+                                                _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+
                                 // If we reached here, both L0 and L1 (if enabled) missed
                                 cacheEnd = Stopwatch.GetTimestamp();
                                 _metrics?.RecordCacheMiss();
@@ -237,17 +369,6 @@ namespace Pyrope.GarnetServer.Extensions
                     if (forceCacheOnly && !cacheHit)
                     {
                         WriteErrorCode(ref output, VectorErrorCodes.Busy, "SLO mode: cache-only.");
-                        return true;
-                    }
-                    if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
-                    {
-                        WriteErrorCode(ref output, VectorErrorCodes.NotFound, "Index not found.");
-                        return true;
-                    }
-
-                    if (index.Dimension != request.Vector.Length)
-                    {
-                        WriteErrorCode(ref output, VectorErrorCodes.DimMismatch, "Vector dimension mismatch.");
                         return true;
                     }
 
@@ -303,8 +424,21 @@ namespace Pyrope.GarnetServer.Extensions
                         {
                             var simHash = _lshService.GenerateSimHash(request.Vector);
                             var roundedK = QueryKey.RoundK(request.TopK);
-                            var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, VectorMetric.L2, request.FilterTags, simHash);
+                            var l1Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, simHash);
                             _resultCache.Set(l1Key, json, policyDecision.Ttl);
+                        }
+
+                        // Set L2 (Semantic Cluster)
+                        if (_clusterRegistry != null)
+                        {
+                            var queryCost = CostCalculator.EstimateSearchCost(index.GetStats(), request.TopK);
+                            var (clusterId, score) = _clusterRegistry.FindNearestCluster(request.TenantId, request.IndexName, request.Vector, metric);
+                            if (clusterId >= 0 && IsClusterCloseEnough(score, metric, queryCost))
+                            {
+                                var roundedK = QueryKey.RoundK(request.TopK);
+                                var l2Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, null, clusterId);
+                                _resultCache.Set(l2Key, json, policyDecision.Ttl);
+                            }
                         }
                     }
 
@@ -646,6 +780,38 @@ namespace Pyrope.GarnetServer.Extensions
             public double PolicyMs { get; set; }
             public double CacheMs { get; set; }
             public double FaissMs { get; set; }
+        }
+        private static bool IsClusterCloseEnough(float score, VectorMetric metric, float queryCost)
+        {
+            // P6-3 Dynamic Threshold Implementation
+            
+            // Base Thresholds (Conservative)
+            // L2: Distance in [0, 4] for normalized vectors. 0.05 is fairly strict.
+            float l2Base = 0.05f; 
+            // Cosine: [0, 1]. 0.95 is fairly strict.
+            float cosineBase = 0.95f;
+
+            // Relaxation Factor based on Cost (Log scale)
+            // Cost 1.0 -> Factor 1.0 (No relax)
+            // Cost 10.0 -> Factor 2.0 (Relax 2x)
+            float relaxFactor = 1.0f + Math.Max(0, (float)Math.Log10(queryCost + 1)); // +1 avoid log(0)
+
+            if (metric == VectorMetric.L2)
+            {
+                // L2: Lower is better (closer).
+                // Relax => Increase threshold (allow larger distance)
+                float threshold = l2Base * relaxFactor;
+                return score <= threshold; 
+            }
+            else
+            {
+                // Cosine/IP: Higher is better.
+                // Relax => Decrease threshold (allow lower similarity)
+                // Threshold = 1.0 - (1.0 - Base) * Factor
+                float tolerance = (1.0f - cosineBase) * relaxFactor;
+                float threshold = 1.0f - tolerance;
+                return score >= threshold;
+            }
         }
     }
 

@@ -6,15 +6,19 @@ import os
 # These imports will work after running codegen.py
 import policy_service_pb2
 import policy_service_pb2_grpc
+
 from feature_engineering import FeatureEngineer
 from policy_engine import HeuristicPolicyEngine
 from logger import QueryLogger
+from prediction_engine import PredictionEngine
+
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def __init__(self, log_path="logs/query_log.jsonl"):
         self._feature_engineer = FeatureEngineer()
         self._policy_engine = HeuristicPolicyEngine()
+        self._prediction_engine = PredictionEngine()
         self._logger = QueryLogger(log_path)
         self._latest_system_features = None
 
@@ -63,6 +67,27 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._logger.log_decision(tenant_id, query_features, system_metrics, decision)
 
         return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
+
+    def ReportClusterAccess(self, request, context):
+        for access in request.accesses:
+            self._prediction_engine.record_interaction(request.tenant_id, request.index_name, access.cluster_id)
+        return policy_service_pb2.ReportClusterAccessResponse(status="OK")
+
+    def GetPrefetchRules(self, request, context):
+        # Trigger training to ensure rules are up to date
+        # In production this might be async/throttled
+        self._prediction_engine.train_model()
+        
+        rules_map = self._prediction_engine.rules.get(f"{request.tenant_id}:{request.index_name}", {})
+        
+        response_rules = []
+        for current_id, next_id in rules_map.items():
+            response_rules.append(policy_service_pb2.PrefetchRule(
+                current_cluster_id=current_id,
+                next_cluster_id=next_id
+            ))
+            
+        return policy_service_pb2.GetPrefetchRulesResponse(rules=response_rules)
 
 
 def _read_file_bytes(path: str) -> bytes:

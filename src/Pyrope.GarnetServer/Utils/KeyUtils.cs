@@ -21,5 +21,12 @@ namespace Pyrope.GarnetServer.Utils
             TenantNamespace.ValidateIndexName(indexName);
             return $"cache:{tenantId}:{indexName}:";
         }
+
+        public static string GetIndexKey(string tenantId, string indexName)
+        {
+            TenantNamespace.ValidateTenantId(tenantId);
+            TenantNamespace.ValidateIndexName(indexName);
+            return $"idx:{tenantId}:{indexName}";
+        }
     }
 }
