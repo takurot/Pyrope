@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Pyrope.GarnetServer.Services;
 
 namespace Pyrope.GarnetServer.Security
 {
@@ -17,7 +18,7 @@ namespace Pyrope.GarnetServer.Security
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         }
 
-        public async Task InvokeAsync(HttpContext context)
+        public async Task InvokeAsync(HttpContext context, TenantUserRegistry userRegistry, TenantRegistry tenantRegistry)
         {
             if (context == null) throw new ArgumentNullException(nameof(context));
 
@@ -50,14 +51,43 @@ namespace Pyrope.GarnetServer.Security
             }
 
             var apiKey = apiKeyValues.ToString();
-            if (!string.Equals(apiKey, _options.AdminApiKey, StringComparison.Ordinal))
+
+            // 1. Check Admin API Key
+            if (string.Equals(apiKey, _options.AdminApiKey, StringComparison.Ordinal))
             {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsync("Invalid API key.");
+                context.Items["PyropeApiKey"] = apiKey;
+                context.Items["PyropeUserId"] = "admin";
+                context.Items["IsAdmin"] = true;
+                await _next(context);
                 return;
             }
 
-            await _next(context);
+            // 2. Check per-user API Key
+            if (userRegistry.TryGetByApiKey(apiKey, out var user))
+            {
+                context.Items["PyropeApiKey"] = apiKey;
+                context.Items["PyropeUserId"] = user!.UserId;
+                context.Items["PyropeTenantId"] = user!.TenantId;
+                context.Items["PyropeUserRole"] = user!.Role.ToString();
+                context.Items["IsAdmin"] = false;
+                await _next(context);
+                return;
+            }
+
+            // 3. Check legacy tenant API Key
+            if (tenantRegistry.TryGetByApiKey(apiKey, out var tenant))
+            {
+                context.Items["PyropeApiKey"] = apiKey;
+                context.Items["PyropeUserId"] = "admin"; // Treated as admin of the tenant
+                context.Items["PyropeTenantId"] = tenant!.TenantId;
+                context.Items["PyropeUserRole"] = Role.TenantAdmin.ToString();
+                context.Items["IsAdmin"] = false;
+                await _next(context);
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsync("Invalid API key.");
         }
     }
 }

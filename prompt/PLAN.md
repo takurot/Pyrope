@@ -96,9 +96,9 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P5-3** | [Core] | **Noisy Neighbor Mitigation**<br>Priority-based scheduling. On P99 breach: degrade low-priority tenant params, tighten admission. | P5-2, P2-5 | [x] |
 | **P5-4** | [Core] | **SLO Guardrails (Shedding)**<br>If `P99 > Target`, auto-degrade search params (lower nprobe/efSearch). Implement `CACHE_HINT=force` SLO mode. | P2-5 | [x] |
 | **P5-5** | [Security] | **Authentication**<br>Implement API Key authentication. mTLS for inter-service communication. | P3-1 | [x] |
-| **P5-6** | [Security] | **Authorization (RBAC)**<br>Implement roles: `tenant_admin`, `operator`, `reader`. Per-tenant index/operation permissions. | P5-5 | [ ] |
-| **P5-7** | [Security] | **Audit Logging**<br>Log all management operations: index create/delete, snapshot, policy change, model switch, quota change. | P5-6 | [ ] |
-| **P5-8** | [Ops] | **Load Testing & Tuning**<br>Run heavy concurrent load. Tune GC, thread pool, cache sizes. Validate SLO compliance. | All | [ ] |
+| **P5-6** | [Security] | **Authorization (RBAC)**<br>Implement roles: `tenant_admin`, `operator`, `reader`. Per-tenant index/operation permissions. | P5-5 | [x] |
+| **P5-7** | [Security] | **Audit Logging**<br>Log all management operations: index create/delete, snapshot, policy change, model switch, quota change. | P5-6 | [x] |
+| **P5-8** | [Ops] | **Load Testing & Tuning**<br>Run heavy concurrent load. Tune GC, thread pool, cache sizes. Validate SLO compliance. | All | [x] |
 
 ---
 
@@ -252,6 +252,18 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
   - Under degradation: protect high-priority tenants; shed low-priority tenants on cache miss.
 - Added **Sidecar gRPC mTLS** (Garnet↔AISidecar): cert-based secure channel + local cert generation script + docker-compose wiring.
 - Implemented **P1-6 Vector Benchmarking Data & Tool**: added `src/Pyrope.Benchmarks` (SIFT fvecs / GloVe txt loaders, QPS/latency reporting) and `scripts/bench_vectors.sh`.
+- Implemented **P5-6 Authorization (RBAC)**:
+  - Added `Role` enum (`Reader`, `Operator`, `TenantAdmin`) and `Permission` enum with role-permission mappings.
+  - Added `TenantUser` model and `TenantUserRegistry` for per-user API key management.
+  - Added `IAuthorizationService` and `RbacAuthorizationService` for permission checks.
+  - Added user management API: `POST /v1/tenants/{id}/users`, `GET /v1/tenants/{id}/users`, `PUT /v1/tenants/{id}/users/{userId}/role`, `DELETE /v1/tenants/{id}/users/{userId}`.
+- Implemented **P5-7 Audit Logging**:
+  - Added `AuditEvent` model with standard actions (`CREATE_INDEX`, `DELETE_INDEX`, `UPDATE_POLICY`, etc.).
+  - Added `IAuditLogger` interface and `AuditLogger` implementation (in-memory + optional JSONL file persistence).
+  - Added `AuditController` with `GET /v1/audit/logs` and `GET /v1/audit/stats` endpoints.
+  - Integrated audit logging into `IndexController`, `TenantController`, and `CacheController`.
+- Implemented **P5-8 Load Testing & Tuning**:
+  - Added `scripts/load_test.sh` for running load tests at various concurrency levels with SLO validation.
 
 ## Tests
 
@@ -272,6 +284,9 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `dotnet run --project src/Pyrope.Benchmarks --configuration Release -- --dataset synthetic --dim 32 --base-limit 5000 --query-limit 1000 --topk 10 --concurrency 4 --warmup 100 --payload binary --host 127.0.0.1 --port 6380 --tenant tenant_bench --index idx_bench --api-key <tenantApiKey> --http http://127.0.0.1:5000 --admin-api-key <adminApiKey> --cache off --print-stats` (P5-3/4/5)
 - `dotnet test Pyrope.sln --configuration Release` (P1-6)
 - `./scripts/check_quality.sh` (P1-6)
+- `dotnet test tests/Pyrope.GarnetServer.Tests --filter "FullyQualifiedName~Rbac"` (P5-6)
+- `dotnet test tests/Pyrope.GarnetServer.Tests --filter "FullyQualifiedName~AuditLogger"` (P5-7)
+- `./scripts/load_test.sh` (P5-8)
 
 ---
 

@@ -81,6 +81,22 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<ITenantAuthenticator, TenantApiKeyAuthenticator>();
             builder.Services.AddSingleton<ISloGuardrails, SloGuardrails>();
 
+            // --- RBAC (P5-6) ---
+            builder.Services.AddSingleton<TenantUserRegistry>();
+            builder.Services.AddSingleton<IAuthorizationService, RbacAuthorizationService>();
+
+            // --- Audit Logging (P5-7) ---
+            builder.Services.AddSingleton<IAuditLogger>(sp =>
+            {
+                var logPath = builder.Configuration["Audit:LogPath"];
+                var maxEvents = 10000;
+                if (int.TryParse(builder.Configuration["Audit:MaxInMemoryEvents"], out var parsed))
+                {
+                    maxEvents = parsed;
+                }
+                return new AuditLogger(logPath, maxEvents);
+            });
+
             // Register Args for GarnetService
             builder.Services.AddSingleton(args);
 
@@ -90,6 +106,14 @@ namespace Pyrope.GarnetServer
             builder.Services.AddHostedService<SloGuardrailsMonitor>();
 
             var app = builder.Build();
+
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | 
+                                 Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+            });
+
+            app.UseRouting();
             app.UseMiddleware<ApiKeyAuthMiddleware>();
             app.MapControllers();
 
