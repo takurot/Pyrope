@@ -18,6 +18,9 @@ namespace Pyrope.GarnetServer.Services
         private readonly ITenantQuotaEnforcer _quotaEnforcer;
         private readonly ITenantAuthenticator _tenantAuthenticator;
         private readonly ISloGuardrails _sloGuardrails;
+        private readonly SemanticClusterRegistry _clusterRegistry;
+        private readonly IPredictivePrefetcher _prefetcher;
+        private readonly ILogger<GarnetService> _logger;
 
         public GarnetService(
             ResultCache resultCache,
@@ -26,7 +29,11 @@ namespace Pyrope.GarnetServer.Services
             LshService lshService,
             ITenantQuotaEnforcer quotaEnforcer,
             ITenantAuthenticator tenantAuthenticator,
+
             ISloGuardrails sloGuardrails,
+            SemanticClusterRegistry clusterRegistry,
+            IPredictivePrefetcher prefetcher,
+            ILogger<GarnetService> logger,
             string[]? args = null)
         {
             _resultCache = resultCache;
@@ -36,6 +43,9 @@ namespace Pyrope.GarnetServer.Services
             _quotaEnforcer = quotaEnforcer;
             _tenantAuthenticator = tenantAuthenticator;
             _sloGuardrails = sloGuardrails;
+            _clusterRegistry = clusterRegistry;
+            _prefetcher = prefetcher;
+            _logger = logger;
             _server = new Garnet.GarnetServer(args ?? Array.Empty<string>());
         }
 
@@ -71,8 +81,8 @@ namespace Pyrope.GarnetServer.Services
             _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert, null, null, null, null, _quotaEnforcer, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
             _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del, null, null, null, null, _quotaEnforcer, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
 
-            // VEC.SEARCH with Caching & Policy & Metrics & LSH
-            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer, _tenantAuthenticator, _sloGuardrails), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+            // VEC.SEARCH with Caching & Policy & Metrics & LSH & Semantic Clustering
+            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer, _tenantAuthenticator, _sloGuardrails, _clusterRegistry, _prefetcher, _logger), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
             // VEC.STATS
             _server.Register.NewCommand("VEC.STATS", CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, _metricsCollector, null, null, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });

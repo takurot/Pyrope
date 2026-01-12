@@ -16,6 +16,7 @@ namespace Pyrope.GarnetServer.Model
         public IReadOnlySet<string> FilterTags { get; }
 
         public long? SimHash { get; }
+        public int? ClusterId { get; }
 
         public QueryKey(
             string tenantId,
@@ -24,7 +25,8 @@ namespace Pyrope.GarnetServer.Model
             int topK,
             VectorMetric metric,
             IReadOnlyList<string>? filterTags,
-            long? simHash = null)
+            long? simHash = null,
+            int? clusterId = null)
         {
             TenantNamespace.ValidateTenantId(tenantId);
             TenantNamespace.ValidateIndexName(indexName);
@@ -34,6 +36,7 @@ namespace Pyrope.GarnetServer.Model
             TopK = topK;
             Metric = metric;
             SimHash = simHash;
+            ClusterId = clusterId;
 
             // Normalize tags: Case-sensitive, sorted/set for uniqueness and order-independence in equality
             if (filterTags == null || filterTags.Count == 0)
@@ -70,16 +73,21 @@ namespace Pyrope.GarnetServer.Model
             // Check tags (Set equality)
             if (!FilterTags.SetEquals(other.FilterTags)) return false;
 
-            // Check Semantic vs Exact
+            // L2: Check ClusterId
+            if (ClusterId.HasValue && other.ClusterId.HasValue)
+            {
+                return ClusterId.Value == other.ClusterId.Value;
+            }
+            if (ClusterId.HasValue != other.ClusterId.HasValue) return false;
+
+            // L1: Check SimHash
             if (SimHash.HasValue && other.SimHash.HasValue)
             {
-                // L1: Compare SimHash
                 return SimHash.Value == other.SimHash.Value;
             }
+            if (SimHash.HasValue != other.SimHash.HasValue) return false;
 
             // L0: Check vector (Exact match)
-            if (SimHash.HasValue != other.SimHash.HasValue) return false; // Mixing types?
-
             if (Vector.Length != other.Vector.Length) return false;
             return Vector.AsSpan().SequenceEqual(other.Vector.AsSpan());
         }
@@ -108,7 +116,15 @@ namespace Pyrope.GarnetServer.Model
             }
             hashCode.Add(tagsHash);
 
-            if (SimHash.HasValue)
+            if (ClusterId.HasValue)
+            {
+                hashCode.Add(ClusterId.Value);
+                // If ClusterId is present, we ignore Vector/SimHash for hashcode to match Equals logic?
+                // Actually Equals logic separates them.
+                // If ClusterId matches, we are equal.
+                // So if ClusterId is present, HashCode should rely on it.
+            }
+            else if (SimHash.HasValue)
             {
                 hashCode.Add(SimHash.Value);
             }

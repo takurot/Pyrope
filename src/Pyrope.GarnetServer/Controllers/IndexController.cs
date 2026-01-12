@@ -223,6 +223,49 @@ namespace Pyrope.GarnetServer.Controllers
             return NotFound("Index not found.");
         }
 
+        [HttpPost("{tenantId}/{indexName}/centroids")]
+        [RequirePermission(Permission.IndexBuild)] // Re-using IndexBuild permission for now
+        public IActionResult UpdateCentroids(string tenantId, string indexName, [FromBody] UpdateCentroidsRequest request, [FromServices] SemanticClusterRegistry clusterRegistry)
+        {
+            if (request == null || request.Centroids == null || request.Centroids.Count == 0)
+                return BadRequest("Centroids are required.");
+
+            if (!TenantNamespace.TryValidateTenantId(tenantId, out var tenantError)) return BadRequest(tenantError);
+            if (!TenantNamespace.TryValidateIndexName(indexName, out var indexError)) return BadRequest(indexError);
+
+            if (!_registry.TryGetIndex(tenantId, indexName, out var index))
+                return NotFound("Index not found.");
+
+            if (request.Dimension != index.Dimension)
+            {
+                return BadRequest($"Dimension mismatch. Index: {index.Dimension}, Request: {request.Dimension}");
+            }
+
+            // Validate centroid dimensions
+            foreach (var c in request.Centroids)
+            {
+                if (c.Length != index.Dimension)
+                    return BadRequest("Centroid dimension mismatch.");
+            }
+
+            clusterRegistry.UpdateCentroids(tenantId, indexName, request.Centroids);
+            _registry.IncrementEpoch(tenantId, indexName); // Invalidate cache (L2 clusters might change)
+
+            // Audit
+            _auditLogger.Log(new AuditEvent(
+                 action: "UPDATE_CENTROIDS",
+                 resourceType: AuditResourceTypes.Index,
+                 tenantId: tenantId,
+                 userId: GetCurrentUserId(),
+                 resourceId: indexName,
+                 details: $"{request.Centroids.Count} centroids",
+                 ipAddress: GetClientIp(),
+                 success: true
+             ));
+
+            return Ok(new { Message = "Centroids updated." });
+        }
+
         private string? GetCurrentUserId() => HttpContext?.Items["PyropeUserId"]?.ToString();
 
         private string? GetClientIp() => HttpContext?.Connection?.RemoteIpAddress?.ToString();
@@ -252,5 +295,11 @@ namespace Pyrope.GarnetServer.Controllers
     public class SnapshotRequest
     {
         public string Path { get; set; } = "";
+    }
+
+    public class UpdateCentroidsRequest
+    {
+        public int Dimension { get; set; }
+        public List<float[]> Centroids { get; set; } = new();
     }
 }

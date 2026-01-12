@@ -80,6 +80,7 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<ITenantQuotaEnforcer, TenantQuotaEnforcer>();
             builder.Services.AddSingleton<ITenantAuthenticator, TenantApiKeyAuthenticator>();
             builder.Services.AddSingleton<ISloGuardrails, SloGuardrails>();
+            builder.Services.AddSingleton<SemanticClusterRegistry>();
 
             // --- RBAC (P5-6) ---
             builder.Services.AddSingleton<TenantUserRegistry>();
@@ -103,6 +104,9 @@ namespace Pyrope.GarnetServer
             // Register GarnetService as Hosted Service
             builder.Services.AddHostedService<GarnetService>();
             builder.Services.AddHostedService<SidecarMetricsReporter>();
+            builder.Services.AddSingleton<PredictivePrefetcher>();
+            builder.Services.AddSingleton<IPredictivePrefetcher>(sp => sp.GetRequiredService<PredictivePrefetcher>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<PredictivePrefetcher>());
             builder.Services.AddHostedService<SloGuardrailsMonitor>();
 
             var app = builder.Build();

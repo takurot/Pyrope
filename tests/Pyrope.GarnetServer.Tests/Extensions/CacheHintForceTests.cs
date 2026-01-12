@@ -59,9 +59,12 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             // Ensure the command key exists so Garnet will invoke our Reader implementation.
             db.Execute("SET", "t_slo", "1");
 
-            // No data, so cache miss is guaranteed.
+            // Create the index so we don't get "Index Not Found" (P6-2 Fix requires index for metric)
+            db.Execute("VEC.ADD", "t_slo", "i_slo", "dummy", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
+
+            // No data in cache for this specific query, so cache miss is guaranteed.
             AssertServerErrorContains(() =>
-                db.Execute("VEC.SEARCH", "t_slo", "i_slo", "TOPK", "1", "VECTOR", "[1,0]", "CACHE_HINT", "force", "API_KEY", TenantApiKey),
+                db.Execute("VEC.SEARCH", "t_slo", "i_slo", "TOPK", "1", "VECTOR", "[0,1]", "CACHE_HINT", "force", "API_KEY", TenantApiKey),
                 "VEC_ERR_BUSY");
         }
 
