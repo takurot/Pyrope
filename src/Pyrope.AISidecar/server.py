@@ -1,3 +1,4 @@
+
 import grpc
 from concurrent import futures
 import time
@@ -11,7 +12,6 @@ from feature_engineering import FeatureEngineer
 from policy_engine import HeuristicPolicyEngine
 from logger import QueryLogger
 from prediction_engine import PredictionEngine
-
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
@@ -77,16 +77,16 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         # Trigger training to ensure rules are up to date
         # In production this might be async/throttled
         self._prediction_engine.train_model()
-        
+
         rules_map = self._prediction_engine.rules.get(f"{request.tenant_id}:{request.index_name}", {})
-        
+
         response_rules = []
         for current_id, next_id in rules_map.items():
             response_rules.append(policy_service_pb2.PrefetchRule(
                 current_cluster_id=current_id,
                 next_cluster_id=next_id
             ))
-            
+
         return policy_service_pb2.GetPrefetchRulesResponse(rules=response_rules)
 
 

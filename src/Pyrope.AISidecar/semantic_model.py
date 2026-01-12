@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 
 logger = logging.getLogger(__name__)
 
+
 class SemanticModelTrainer:
     def __init__(self, n_clusters=256, random_state=42):
         self.n_clusters = n_clusters
@@ -33,19 +34,19 @@ class SemanticModelTrainer:
         """
         url = f"{garnet_base_url.rstrip('/')}/v1/indexes/{tenant_id}/{index_name}/centroids"
         dim = centroids.shape[1]
-        
+
         # Convert to list of lists for JSON
         centroids_list = centroids.tolist()
-        
+
         payload = {
             "dimension": dim,
             "centroids": centroids_list
         }
-        
+
         headers = {
             "X-API-KEY": api_key
         }
-        
+
         try:
             logger.info(f"Pushing {len(centroids_list)} centroids (dim={dim}) to {url}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
@@ -55,14 +56,15 @@ class SemanticModelTrainer:
             logger.error(f"Failed to push centroids: {e}")
             raise
 
+
 if __name__ == "__main__":
     # Test execution
     logging.basicConfig(level=logging.INFO)
-    
+
     # Generate dummy data
     data = np.random.rand(1000, 32).astype(np.float32)
     trainer = SemanticModelTrainer(n_clusters=10)
     centroids = trainer.train_centroids(data)
-    
+
     # Uncomment to push if server is running
-    trainer.push_centroids(centroids, "tenant_bench", "idx_bench", "http://localhost:5000", "admin123")
+    # trainer.push_centroids(centroids, "tenant_bench", "idx_bench", "http://localhost:5000", "admin123")
