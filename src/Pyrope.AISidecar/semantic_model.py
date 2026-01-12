@@ -1,4 +1,3 @@
-
 import numpy as np
 import requests
 import logging
@@ -28,7 +27,9 @@ class SemanticModelTrainer:
         kmeans.fit(vectors)
         return kmeans.cluster_centers_
 
-    def push_centroids(self, centroids: np.ndarray, tenant_id: str, index_name: str, garnet_base_url: str, api_key: str):
+    def push_centroids(
+        self, centroids: np.ndarray, tenant_id: str, index_name: str, garnet_base_url: str, api_key: str
+    ):
         """
         Push centroids to Garnet Server.
         """
@@ -38,14 +39,9 @@ class SemanticModelTrainer:
         # Convert to list of lists for JSON
         centroids_list = centroids.tolist()
 
-        payload = {
-            "dimension": dim,
-            "centroids": centroids_list
-        }
+        payload = {"dimension": dim, "centroids": centroids_list}
 
-        headers = {
-            "X-API-KEY": api_key
-        }
+        headers = {"X-API-KEY": api_key}
 
         try:
             logger.info(f"Pushing {len(centroids_list)} centroids (dim={dim}) to {url}")

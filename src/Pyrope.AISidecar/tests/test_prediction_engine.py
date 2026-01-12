@@ -1,4 +1,3 @@
-
 import unittest
 from prediction_engine import PredictionEngine
 
@@ -29,5 +28,5 @@ class TestPredictionEngine(unittest.TestCase):
         self.assertEqual(pred_bad, -1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

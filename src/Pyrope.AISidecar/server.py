@@ -1,4 +1,3 @@
-
 import grpc
 from concurrent import futures
 import time
@@ -82,10 +81,9 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
         response_rules = []
         for current_id, next_id in rules_map.items():
-            response_rules.append(policy_service_pb2.PrefetchRule(
-                current_cluster_id=current_id,
-                next_cluster_id=next_id
-            ))
+            response_rules.append(
+                policy_service_pb2.PrefetchRule(current_cluster_id=current_id, next_cluster_id=next_id)
+            )
 
         return policy_service_pb2.GetPrefetchRulesResponse(rules=response_rules)
 
