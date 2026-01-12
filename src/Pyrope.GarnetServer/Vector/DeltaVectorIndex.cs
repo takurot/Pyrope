@@ -8,6 +8,7 @@ namespace Pyrope.GarnetServer.Vector
     {
         private readonly IVectorIndex _head;
         private readonly IVectorIndex _tail;
+        private readonly System.Threading.ReaderWriterLockSlim _lock = new();
 
         public int Dimension => _head.Dimension;
         public VectorMetric Metric => _head.Metric;
@@ -27,37 +28,69 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Add(string id, float[] vector)
         {
-            // Writes go to Head (Mutable)
-            _head.Add(id, vector);
+            _lock.EnterWriteLock();
+            try
+            {
+                // Writes go to Head (Mutable)
+                _head.Add(id, vector);
 
-            // Note: If ID exists in Tail, we effectively shadow it because Search checks Head first/prioritizes Head.
+                // Note: If ID exists in Tail, we effectively shadow it because Search checks Head first/prioritizes Head.
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         public void Upsert(string id, float[] vector)
         {
-            _head.Upsert(id, vector);
+            _lock.EnterWriteLock();
+            try
+            {
+                _head.Upsert(id, vector);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         public bool Delete(string id)
         {
-            // Propagate delete to both to ensure it's gone
-            // In a real LSM, we might write a tombstone to Head.
-            // But since our underlying indices support Delete, we attempt both.
-            bool h = _head.Delete(id);
-            bool t = _tail.Delete(id);
-            return h || t;
+            _lock.EnterWriteLock();
+            try
+            {
+                // Propagate delete to both to ensure it's gone
+                // In a real LSM, we might write a tombstone to Head.
+                // But since our underlying indices support Delete, we attempt both.
+                bool h = _head.Delete(id);
+                bool t = _tail.Delete(id);
+                return h || t;
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         public IReadOnlyList<SearchResult> Search(float[] query, int topK, SearchOptions? options = null)
         {
-            // 1. Search Head
-            var headResults = _head.Search(query, topK, options);
+            IReadOnlyList<SearchResult> headResults;
+            IReadOnlyList<SearchResult> tailResults;
 
-            // 2. Search Tail details
-            // We might need to fetch more from tail if head has deletions (tombstones), 
-            // but for now we fetch topK from each and merge.
-            // Optimization: If Head has enough results with very high score, we might verify threshold.
-            var tailResults = _tail.Search(query, topK, options);
+            _lock.EnterReadLock();
+            try
+            {
+                // 1. Search Head
+                headResults = _head.Search(query, topK, options);
+
+                // 2. Search Tail details
+                tailResults = _tail.Search(query, topK, options);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
 
             // 3. Merge & Deduplicate
             // Head wins on ID collision.
@@ -96,37 +129,73 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Snapshot(string path)
         {
-            // Snapshot both components with suffixes
-            _head.Snapshot(path + ".head");
-            _tail.Snapshot(path + ".tail");
+            _lock.EnterReadLock();
+            try
+            {
+                // 1. Performance snapshot to temporary paths
+                string headPath = path + ".head";
+                string tailPath = path + ".tail";
+                string headTmp = headPath + ".tmp";
+                string tailTmp = tailPath + ".tmp";
 
-            // Write manifest to original path (satisfies "File.Exists(path)" and metadata)
-            System.IO.File.WriteAllText(path, "{\"Type\": \"Delta\", \"Head\": \".head\", \"Tail\": \".tail\"}");
+                // Snapshot both components with temporary suffixes
+                _head.Snapshot(headTmp);
+                _tail.Snapshot(tailTmp);
+
+                // Atomic move
+                if (System.IO.File.Exists(headPath)) System.IO.File.Delete(headPath);
+                if (System.IO.File.Exists(tailPath)) System.IO.File.Delete(tailPath);
+                System.IO.File.Move(headTmp, headPath);
+                System.IO.File.Move(tailTmp, tailPath);
+
+                // Write manifest to original path
+                string manifestTmp = path + ".tmp";
+                System.IO.File.WriteAllText(manifestTmp, "{\"Type\": \"Delta\", \"Head\": \".head\", \"Tail\": \".tail\"}");
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                System.IO.File.Move(manifestTmp, path);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
         }
 
         public void Load(string path)
         {
-            // Load both components
-            // Note: This assumes files exist.
-            // If strictly new, might fail if files don't exist.
-            // But Load usually assumes existing snapshot.
-            if (System.IO.File.Exists(path + ".head"))
+            _lock.EnterWriteLock();
+            try
             {
-                _head.Load(path + ".head");
+                // Load both components
+                if (System.IO.File.Exists(path + ".head"))
+                {
+                    _head.Load(path + ".head");
+                }
+                if (System.IO.File.Exists(path + ".tail"))
+                {
+                    _tail.Load(path + ".tail");
+                }
             }
-            if (System.IO.File.Exists(path + ".tail"))
+            finally
             {
-                _tail.Load(path + ".tail");
+                _lock.ExitWriteLock();
             }
         }
 
         public IndexStats GetStats()
         {
-            var h = _head.GetStats();
-            var t = _tail.GetStats();
-            // Count is approx sum (minus duplicates). accurate count is expensive without keeping ID set.
-            // Just sum for now.
-            return new IndexStats(h.Count + t.Count, h.Dimension, h.Metric);
+            _lock.EnterReadLock();
+            try
+            {
+                var h = _head.GetStats();
+                var t = _tail.GetStats();
+                // Count is approx sum (minus duplicates). accurate count is expensive without keeping ID set.
+                // Just sum for now.
+                return new IndexStats(h.Count + t.Count, h.Dimension, h.Metric);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
         }
     }
 }

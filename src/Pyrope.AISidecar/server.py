@@ -2,6 +2,7 @@ import grpc
 from concurrent import futures
 import time
 import os
+import threading
 
 # These imports will work after running codegen.py
 import policy_service_pb2
@@ -20,6 +21,18 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._prediction_engine = PredictionEngine()
         self._logger = QueryLogger(log_path)
         self._latest_system_features = None
+
+        # Start background training
+        self._training_thread = threading.Thread(target=self._training_loop, daemon=True)
+        self._training_thread.start()
+
+    def _training_loop(self):
+        while True:
+            try:
+                self._prediction_engine.train_model()
+            except Exception as e:
+                print(f"Error in training loop: {e}")
+            time.sleep(60)
 
     def GetIndexPolicy(self, request, context):
         print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
@@ -73,10 +86,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         return policy_service_pb2.ReportClusterAccessResponse(status="OK")
 
     def GetPrefetchRules(self, request, context):
-        # Trigger training to ensure rules are up to date
-        # In production this might be async/throttled
-        self._prediction_engine.train_model()
-
+        # Rules are updated by background thread
         rules_map = self._prediction_engine.rules.get(f"{request.tenant_id}:{request.index_name}", {})
 
         response_rules = []

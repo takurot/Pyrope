@@ -74,9 +74,41 @@ public static class Program
         }
 
         // Pre-encode queries to avoid per-request allocations in the hot loop
-        var encodedQueries = queryVectors
+        var rawQueries = queryVectors;
+        if (options.UniqueQueries > 0 && options.UniqueQueries < rawQueries.Count)
+        {
+            rawQueries = rawQueries.Take(options.UniqueQueries).ToList();
+        }
+
+        var uniqueEncoded = rawQueries
             .Select(v => options.UseBinaryPayload ? (RedisValue)VectorEncoding.ToLittleEndianBytes(v) : (RedisValue)JsonSerializer.Serialize(v))
             .ToArray();
+
+        RedisValue[] encodedQueries;
+        if (options.Repeat > 1)
+        {
+            var repeated = new List<RedisValue>(options.QueryLimit);
+            for (var i = 0; i < options.QueryLimit; i++)
+            {
+                repeated.Add(uniqueEncoded[i % uniqueEncoded.Length]);
+            }
+            encodedQueries = repeated.ToArray();
+        }
+        else if (options.Sequence)
+        {
+            // Simple sequence for prefetch testing: A, B, A, B, ...
+            // Expects at least 2 unique queries.
+            var seq = new List<RedisValue>(options.QueryLimit);
+            for (var i = 0; i < options.QueryLimit; i++)
+            {
+                seq.Add(uniqueEncoded[i % Math.Min(uniqueEncoded.Length, 2)]);
+            }
+            encodedQueries = seq.ToArray();
+        }
+        else
+        {
+            encodedQueries = uniqueEncoded;
+        }
 
         // 1) Load base vectors
         Console.WriteLine($"[Pyrope.Benchmarks] Loading base vectors: {options.BaseLimit} ...");
@@ -445,6 +477,9 @@ public static class Program
         options.PrintStats = map.ContainsKey("--print-stats");
         options.TenantApiKey = map.TryGetValue("--api-key", out var apiKey) ? apiKey : options.TenantApiKey;
         options.AdminApiKey = map.TryGetValue("--admin-api-key", out var adminKey) ? adminKey : options.AdminApiKey;
+        options.UniqueQueries = TryGetInt(map, "--unique-queries", options.UniqueQueries);
+        options.Repeat = TryGetInt(map, "--repeat", options.Repeat);
+        options.Sequence = map.ContainsKey("--sequence");
 
         var payload = map.TryGetValue("--payload", out var payloadValue) ? payloadValue : null;
         if (!string.IsNullOrWhiteSpace(payload))
@@ -515,6 +550,9 @@ public static class Program
         Console.WriteLine("  --concurrency <n>             (default: CPU count)");
         Console.WriteLine("  --warmup <n>                  (default: 100)");
         Console.WriteLine("  --print-stats                 (optional) prints VEC.STATS after benchmark");
+        Console.WriteLine("  --unique-queries <n>          (optional) limit to N unique queries from dataset");
+        Console.WriteLine("  --repeat <n>                  (optional) repeat unique queries to fill query-limit");
+        Console.WriteLine("  --sequence                    (optional) use A, B, A, B sequence to test prefetching");
         Console.WriteLine();
         Console.WriteLine("Dataset: sift (SIFT1M fvecs)");
         Console.WriteLine("  --dataset sift --sift-dir <dir>            expects <dir>/sift_base.fvecs and <dir>/sift_query.fvecs");
@@ -559,6 +597,9 @@ public static class Program
         public string CacheMode { get; set; } = "off";
         public string IdPrefix { get; set; } = "v";
         public bool PrintStats { get; set; }
+        public int UniqueQueries { get; set; }
+        public int Repeat { get; set; } = 1;
+        public bool Sequence { get; set; }
     }
 
     private sealed record LoadResult(int Loaded, TimeSpan Elapsed, double Throughput);

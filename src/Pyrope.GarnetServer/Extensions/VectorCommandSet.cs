@@ -38,6 +38,7 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly ISloGuardrails? _sloGuardrails;
         private readonly SemanticClusterRegistry? _clusterRegistry;
         private readonly IPredictivePrefetcher? _prefetcher;
+        private readonly IPrefetchBackgroundQueue? _prefetchQueue;
         private readonly ILogger? _logger;
 
         public VectorCommandSet(
@@ -52,6 +53,7 @@ namespace Pyrope.GarnetServer.Extensions
 
             SemanticClusterRegistry? clusterRegistry = null,
             IPredictivePrefetcher? prefetcher = null,
+            IPrefetchBackgroundQueue? prefetchQueue = null,
             ILogger? logger = null)
         {
             _commandType = commandType;
@@ -64,6 +66,7 @@ namespace Pyrope.GarnetServer.Extensions
             _sloGuardrails = sloGuardrails;
             _clusterRegistry = clusterRegistry;
             _prefetcher = prefetcher;
+            _prefetchQueue = prefetchQueue;
             _logger = logger;
         }
 
@@ -271,9 +274,9 @@ namespace Pyrope.GarnetServer.Extensions
                                             // Make local copies for closure
                                             var pfMetric = metric;
 
-                                            Task.Run(() =>
+                                            if (_prefetchQueue != null)
                                             {
-                                                try
+                                                _prefetchQueue.TryQueuePrefetch(async (cancellationToken) =>
                                                 {
                                                     // Construct QueryKey for the *predicted* cluster
                                                     // Note: We use the centroid as the vector, and explicitly set the ClusterId.
@@ -310,13 +313,10 @@ namespace Pyrope.GarnetServer.Extensions
                                                         // Ideally, we'd use PolicyEngine, but for prefetch we assume high utility.
                                                         _resultCache.Set(pfKey, pfJson, TimeSpan.FromMinutes(5));
                                                     }
-                                                }
-                                                catch (Exception ex)
-                                                {
-                                                    // Swallow background errors to valid crash
-                                                    _logger?.LogWarning(ex, "Background prefetch failed for tenant {TenantId}, index {IndexName}", pfTenant, pfIndex);
-                                                }
-                                            });
+
+                                                    await Task.CompletedTask;
+                                                });
+                                            }
                                         }
                                     }
 

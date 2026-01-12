@@ -109,6 +109,11 @@ namespace Pyrope.GarnetServer
             builder.Services.AddHostedService(sp => sp.GetRequiredService<PredictivePrefetcher>());
             builder.Services.AddHostedService<SloGuardrailsMonitor>();
 
+            // --- Background Services (P6-5) ---
+            builder.Services.AddSingleton<PrefetchBackgroundQueue>();
+            builder.Services.AddSingleton<IPrefetchBackgroundQueue>(sp => sp.GetRequiredService<PrefetchBackgroundQueue>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<PrefetchBackgroundQueue>());
+
             var app = builder.Build();
 
             app.UseForwardedHeaders(new ForwardedHeadersOptions
