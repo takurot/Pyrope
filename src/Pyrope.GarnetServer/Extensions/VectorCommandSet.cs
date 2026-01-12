@@ -253,13 +253,13 @@ namespace Pyrope.GarnetServer.Extensions
                                     // Use actual index metric for clustering too
                                     var queryCost = CostCalculator.EstimateSearchCost(index.GetStats(), request.TopK);
                                     var (clusterId, score) = _clusterRegistry.FindNearestCluster(request.TenantId, request.IndexName, request.Vector, metric);
-                                    
+
                                     // P6-4 Predictive Prefetching
                                     if (_prefetcher != null && clusterId >= 0)
                                     {
                                         _prefetcher.RecordInteraction(request.TenantId, request.IndexName, clusterId);
                                         var nextCluster = _prefetcher.GetPrediction(request.TenantId, request.IndexName, clusterId);
-                                        
+
                                         // P6-5 Prefetch Execution
                                         if (nextCluster >= 0 && _clusterRegistry.TryGetCentroid(request.TenantId, request.IndexName, nextCluster, out var centroid) && centroid != null)
                                         {
@@ -270,19 +270,19 @@ namespace Pyrope.GarnetServer.Extensions
                                             var pfTags = request.FilterTags;
                                             // Make local copies for closure
                                             var pfMetric = metric;
-                                            
-                                            Task.Run(() => 
+
+                                            Task.Run(() =>
                                             {
-                                                try 
+                                                try
                                                 {
                                                     // Construct QueryKey for the *predicted* cluster
                                                     // Note: We use the centroid as the vector, and explicitly set the ClusterId.
                                                     // This ensures that when a user query subsequently maps to this cluster,
                                                     // it will form a QueryKey with the SAME ClusterId, and thus hit this cache entry.
                                                     var pfKey = new QueryKey(pfTenant, pfIndex, centroid, pfTopK, pfMetric, pfTags, null, nextCluster);
-                                                    
+
                                                     // Check if already in cache to avoid redundant work
-                                                    if (_resultCache.TryGet(pfKey, out _)) return; 
+                                                    if (_resultCache.TryGet(pfKey, out _)) return;
 
                                                     // Perform Search
                                                     if (IndexRegistry.TryGetIndex(pfTenant, pfIndex, out var idx))
@@ -290,7 +290,7 @@ namespace Pyrope.GarnetServer.Extensions
                                                         // Note: We scan the index using the centroid.
                                                         // This gives us the "best" results for the center of the cluster.
                                                         var raw = idx.Search(centroid, pfTopK);
-                                                        
+
                                                         // Filter & Hydrate
                                                         var res = new List<SearchHitDto>(raw.Count);
                                                         foreach (var h in raw)
@@ -324,7 +324,7 @@ namespace Pyrope.GarnetServer.Extensions
                                     {
                                         var roundedK = QueryKey.RoundK(request.TopK);
                                         var l2Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, null, clusterId);
-                                        
+
                                         if (_resultCache.TryGet(l2Key, out var l2Json) && !string.IsNullOrEmpty(l2Json))
                                         {
                                             var l2Hits = System.Text.Json.JsonSerializer.Deserialize<List<SearchHitDto>>(l2Json);
@@ -345,7 +345,7 @@ namespace Pyrope.GarnetServer.Extensions
                                                     })
                                                     : null;
                                                 WriteResults(ref output, l2Hits, request.IncludeMeta, traceJson);
-                                                _metrics?.RecordCacheHit(); 
+                                                _metrics?.RecordCacheHit();
                                                 _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
                                                 return true;
                                             }
@@ -784,10 +784,10 @@ namespace Pyrope.GarnetServer.Extensions
         private static bool IsClusterCloseEnough(float score, VectorMetric metric, float queryCost)
         {
             // P6-3 Dynamic Threshold Implementation
-            
+
             // Base Thresholds (Conservative)
             // L2: Distance in [0, 4] for normalized vectors. 0.05 is fairly strict.
-            float l2Base = 0.05f; 
+            float l2Base = 0.05f;
             // Cosine: [0, 1]. 0.95 is fairly strict.
             float cosineBase = 0.95f;
 
@@ -801,7 +801,7 @@ namespace Pyrope.GarnetServer.Extensions
                 // L2: Lower is better (closer).
                 // Relax => Increase threshold (allow larger distance)
                 float threshold = l2Base * relaxFactor;
-                return score <= threshold; 
+                return score <= threshold;
             }
             else
             {

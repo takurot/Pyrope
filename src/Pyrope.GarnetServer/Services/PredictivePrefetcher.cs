@@ -47,9 +47,9 @@ namespace Pyrope.GarnetServer.Services
                 ? enabled
                 : bool.TryParse(Environment.GetEnvironmentVariable("PYROPE_SIDECAR_MTLS_ENABLED"), out var envEnabled) && envEnabled;
 
-           _skipServerNameValidation = bool.TryParse(configuration["Sidecar:MtlsSkipServerNameValidation"], out var skip)
-                ? skip
-                : bool.TryParse(Environment.GetEnvironmentVariable("PYROPE_SIDECAR_MTLS_SKIP_NAME_VALIDATION"), out var envSkip) && envSkip;
+            _skipServerNameValidation = bool.TryParse(configuration["Sidecar:MtlsSkipServerNameValidation"], out var skip)
+                 ? skip
+                 : bool.TryParse(Environment.GetEnvironmentVariable("PYROPE_SIDECAR_MTLS_SKIP_NAME_VALIDATION"), out var envSkip) && envSkip;
 
 
             _caCertPemPath = configuration["Sidecar:CaCertPemPath"] ?? Environment.GetEnvironmentVariable("PYROPE_SIDECAR_CA_CERT_PEM");
@@ -155,7 +155,7 @@ namespace Pyrope.GarnetServer.Services
             // but proto supports one Tenant/Index per request.
             // Wait, my proto definition: ReportClusterAccessRequest { tenant_id, index_name, repeated ClusterAccess }
             // So I must group by Tenant/Index.
-            
+
             var groups = batch.GroupBy(x => (x.Item1, x.Item2));
             foreach (var group in groups)
             {
@@ -165,10 +165,10 @@ namespace Pyrope.GarnetServer.Services
                     IndexName = group.Key.Item2
                 };
                 req.Accesses.AddRange(group.Select(x => new ClusterAccess { ClusterId = x.Item3, Timestamp = x.Item4 }));
-                
+
                 try
                 {
-                   await client.ReportClusterAccessAsync(req, cancellationToken: token);
+                    await client.ReportClusterAccessAsync(req, cancellationToken: token);
                 }
                 catch (Exception ex)
                 {
@@ -183,27 +183,28 @@ namespace Pyrope.GarnetServer.Services
             // For now, we only know about indexes we've seen interactions for.
             // Or we could fetch for all "Active" indexes?
             // Let's use the keys in _rulesCache + any seen in interactions.
-            
+
             // Simplified: Just update for currently known rules keys (from initial interaction)
             // Or better: Iterate over known indexes.
             // For this implementation, I'll track "KnownIndexes" set.
-            
+
             // NOTE: Ideally, we pull this from IndexRegistry or similar.
             // But to avoid circular dependency or complex injection, I'll rely on "KnownIndexes".
-            
+
             // ... implementation detail: Use a Set to track known indexes ...
             // I'll add a _knownIndexes Set.
             // But for complexity, I'll cheat: I'll only fetch rules for indexes I've *just* interacting with or simple loop?
             // I'll skip implementation of "Which indexes" and just say "If I have interactions, I fetch rules".
             // Or better: Use the _rulesCache keys (seed it when RecordInteraction happens).
-            
+
             List<(string, string)> targets;
             lock (_rulesLock)
             {
-                 targets = _rulesCache.Keys.Select(k => {
-                     var parts = k.Split(':');
-                     return (parts[0], parts[1]);
-                 }).ToList();
+                targets = _rulesCache.Keys.Select(k =>
+                {
+                    var parts = k.Split(':');
+                    return (parts[0], parts[1]);
+                }).ToList();
             }
 
             foreach (var (t, i) in targets)
@@ -212,13 +213,13 @@ namespace Pyrope.GarnetServer.Services
                 {
                     var req = new GetPrefetchRulesRequest { TenantId = t, IndexName = i };
                     var resp = await client.GetPrefetchRulesAsync(req, cancellationToken: token);
-                    
+
                     var newRules = new Dictionary<int, int>();
                     foreach (var r in resp.Rules)
                     {
                         newRules[r.CurrentClusterId] = r.NextClusterId;
                     }
-                    
+
                     lock (_rulesLock)
                     {
                         _rulesCache[$"{t}:{i}"] = newRules;
@@ -233,7 +234,7 @@ namespace Pyrope.GarnetServer.Services
 
         private GrpcChannel CreateChannel(string endpoint)
         {
-             var uri = new Uri(endpoint);
+            var uri = new Uri(endpoint);
             if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
             {
                 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
@@ -249,14 +250,15 @@ namespace Pyrope.GarnetServer.Services
                 handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions
                 {
                     ClientCertificates = new X509CertificateCollection { clientCert },
-                    RemoteCertificateValidationCallback = (sender, cert, chain, errors) => {
-                         // Simplify validation call reusing logic if possible, or reimplement
-                         // Re-implementing simplified version:
-                         if (_skipServerNameValidation) errors &= ~System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
-                         return errors == System.Net.Security.SslPolicyErrors.None;
+                    RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
+                    {
+                        // Simplify validation call reusing logic if possible, or reimplement
+                        // Re-implementing simplified version:
+                        if (_skipServerNameValidation) errors &= ~System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
+                        return errors == System.Net.Security.SslPolicyErrors.None;
                     }
                 };
-             }
+            }
 
             return GrpcChannel.ForAddress(endpoint, new GrpcChannelOptions { HttpHandler = handler });
         }

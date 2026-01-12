@@ -40,7 +40,7 @@ namespace Pyrope.GarnetServer.Tests.Services
             // Start service
             var cts = new CancellationTokenSource();
             await service.StartAsync(cts.Token);
-            
+
             // Allow some time for background loop
             await Task.Delay(500);
             await service.StopAsync(cts.Token);

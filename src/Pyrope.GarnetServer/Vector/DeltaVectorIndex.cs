@@ -29,7 +29,7 @@ namespace Pyrope.GarnetServer.Vector
         {
             // Writes go to Head (Mutable)
             _head.Add(id, vector);
-            
+
             // Note: If ID exists in Tail, we effectively shadow it because Search checks Head first/prioritizes Head.
         }
 
@@ -52,7 +52,7 @@ namespace Pyrope.GarnetServer.Vector
         {
             // 1. Search Head
             var headResults = _head.Search(query, topK, options);
-            
+
             // 2. Search Tail details
             // We might need to fetch more from tail if head has deletions (tombstones), 
             // but for now we fetch topK from each and merge.

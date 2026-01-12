@@ -253,7 +253,7 @@ namespace Pyrope.GarnetServer.Controllers
 
             // Audit
             _auditLogger.Log(new AuditEvent(
-                 action: "UPDATE_CENTROIDS", 
+                 action: "UPDATE_CENTROIDS",
                  resourceType: AuditResourceTypes.Index,
                  tenantId: tenantId,
                  userId: GetCurrentUserId(),

@@ -43,7 +43,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
 
             // Search near head1
             var results = _deltaIndex.Search(new float[] { 1, 0 }, 10);
-            
+
             Assert.Equal(2, results.Count);
             Assert.Contains(results, r => r.Id == "head1");
             Assert.Contains(results, r => r.Id == "tail1");
@@ -54,7 +54,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
         {
             // Version 1 in Tail (far away)
             _tail.Add("doc1", new float[] { 100, 100 });
-            
+
             // Version 2 in Head (close)
             _head.Add("doc1", new float[] { 1, 0 });
 

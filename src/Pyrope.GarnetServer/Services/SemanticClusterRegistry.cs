@@ -37,7 +37,7 @@ namespace Pyrope.GarnetServer.Services
             for (int i = 0; i < centroids.Count; i++)
             {
                 float score = VectorMath.CalculateDistance(query, centroids[i], metric);
-                
+
                 if (metric == VectorMetric.L2)
                 {
                     if (score < bestScore)
