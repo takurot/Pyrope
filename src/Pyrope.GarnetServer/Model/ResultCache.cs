@@ -70,6 +70,42 @@ namespace Pyrope.GarnetServer.Model
             }
         }
 
+        public bool TryGetAliased(int canonicalHash, QueryKey sourceKey, out string? resultJson)
+        {
+            resultJson = null;
+
+            // Construct storage key using canonical hash
+            var storageKey = $"cache:{sourceKey.TenantId}:{sourceKey.IndexName}:{canonicalHash}";
+
+            if (!_storage.TryGet(storageKey, out var data) || data == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var cachedItemDto = JsonSerializer.Deserialize<CachedItemDto>(data, _jsonOptions);
+                if (cachedItemDto == null) return false;
+
+                // For aliased lookup, we skip exact key matching (as keys differ by definition).
+                // But we must verify Epoch to prevent reading stale alias targets.
+                var currentEpoch = _indexRegistry.GetEpoch(sourceKey.TenantId, sourceKey.IndexName);
+                if (cachedItemDto.Epoch != currentEpoch)
+                {
+                    _metrics?.RecordEviction("epoch_mismatch_alias");
+                    return false;
+                }
+
+                resultJson = cachedItemDto.ResultJson;
+                return true;
+            }
+            catch (Exception)
+            {
+                _metrics?.RecordEviction("corruption_alias");
+                return false;
+            }
+        }
+
         public void Set(QueryKey key, string resultJson, TimeSpan? ttl = null)
         {
             var currentEpoch = _indexRegistry.GetEpoch(key.TenantId, key.IndexName);

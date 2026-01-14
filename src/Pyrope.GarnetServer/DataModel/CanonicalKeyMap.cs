@@ -10,12 +10,12 @@ namespace Pyrope.GarnetServer.DataModel
     /// </summary>
     public sealed class CanonicalKeyMap
     {
-        private readonly ConcurrentDictionary<ulong, AliasEntry> _aliases = new();
+        private readonly ConcurrentDictionary<int, AliasEntry> _aliases = new();
 
         /// <summary>
         /// Try to get the canonical hash for a given source hash.
         /// </summary>
-        public bool TryGetCanonical(ulong sourceHash, out ulong canonicalHash, out float confidence)
+        public bool TryGetCanonical(int sourceHash, out int canonicalHash, out float confidence)
         {
             if (_aliases.TryGetValue(sourceHash, out var entry))
             {
@@ -32,7 +32,7 @@ namespace Pyrope.GarnetServer.DataModel
         /// <summary>
         /// Set an alias mapping from source to canonical hash.
         /// </summary>
-        public void SetAlias(ulong sourceHash, ulong canonicalHash, float confidence = 1.0f, TimeSpan? ttl = null)
+        public void SetAlias(int sourceHash, int canonicalHash, float confidence = 1.0f, TimeSpan? ttl = null)
         {
             var entry = new AliasEntry
             {
@@ -46,7 +46,7 @@ namespace Pyrope.GarnetServer.DataModel
         /// <summary>
         /// Remove an alias mapping.
         /// </summary>
-        public bool RemoveAlias(ulong sourceHash)
+        public bool RemoveAlias(int sourceHash)
         {
             return _aliases.TryRemove(sourceHash, out _);
         }
@@ -86,7 +86,7 @@ namespace Pyrope.GarnetServer.DataModel
 
         private sealed class AliasEntry
         {
-            public ulong CanonicalHash { get; set; }
+            public int CanonicalHash { get; set; }
             public float Confidence { get; set; }
             public DateTimeOffset ExpiresAt { get; set; }
         }

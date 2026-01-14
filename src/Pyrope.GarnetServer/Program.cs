@@ -7,6 +7,7 @@ using Pyrope.GarnetServer.Security;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
 using Pyrope.GarnetServer.Services;
+using Pyrope.GarnetServer.DataModel;
 
 namespace Pyrope.GarnetServer
 {
@@ -81,6 +82,7 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<ITenantAuthenticator, TenantApiKeyAuthenticator>();
             builder.Services.AddSingleton<ISloGuardrails, SloGuardrails>();
             builder.Services.AddSingleton<SemanticClusterRegistry>();
+            builder.Services.AddSingleton<CanonicalKeyMap>();
 
             // --- RBAC (P5-6) ---
             builder.Services.AddSingleton<TenantUserRegistry>();
