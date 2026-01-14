@@ -46,5 +46,11 @@ namespace Pyrope.GarnetServer.Model
         /// 0 = high, 1 = normal, 2 = low (default).
         /// </summary>
         public int Priority { get; set; } = 1;
+
+        /// <summary>
+        /// Monthly budget for compute cost (Proxy Cost Metric).
+        /// If exceeded, query parameters will be degraded to save cost.
+        /// </summary>
+        public double? MonthlyBudget { get; set; }
     }
 }

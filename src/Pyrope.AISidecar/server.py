@@ -3,6 +3,7 @@ from concurrent import futures
 import time
 import os
 import threading
+import asyncio
 
 # These imports will work after running codegen.py
 import policy_service_pb2
@@ -14,6 +15,8 @@ from logger import QueryLogger
 from prediction_engine import PredictionEngine
 
 
+from llm_worker import LLMWorker
+
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def __init__(self, log_path="logs/query_log.jsonl"):
         self._feature_engineer = FeatureEngineer()
@@ -21,10 +24,17 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._prediction_engine = PredictionEngine()
         self._logger = QueryLogger(log_path)
         self._latest_system_features = None
+        self._llm_worker = LLMWorker() # Initialize LLM Worker
 
         # Start background training
         self._training_thread = threading.Thread(target=self._training_loop, daemon=True)
         self._training_thread.start()
+        
+    def start_background_services(self):
+        asyncio.run(self._llm_worker.start())
+
+    def stop_background_services(self):
+        asyncio.run(self._llm_worker.stop())
 
     def _training_loop(self):
         while True:
@@ -138,8 +148,18 @@ def _configure_ports(server: grpc.Server, port: int) -> None:
 def serve():
     port = int(os.getenv("PYROPE_SIDECAR_PORT", "50051"))
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(PolicyService(), server)
+    policy_service = PolicyService()
+    policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(policy_service, server)
+    
     _configure_ports(server, port)
+    
+    # Start LLM Worker in background (fire and forget for now, ideally managed loop)
+    # Since asyncio event loop isn't running in this thread, we need a way to run it.
+    # For now, we'll start it in a separate thread to not block the GRPC server.
+    loop = asyncio.new_event_loop()
+    t = threading.Thread(target=lambda: (asyncio.set_event_loop(loop), loop.run_until_complete(policy_service._llm_worker.start()), loop.run_forever()), daemon=True)
+    t.start()
+    
     print(
         f"Starting AI Sidecar server on port {port} (mTLS={'on' if _parse_bool_env('PYROPE_SIDECAR_MTLS_ENABLED') else 'off'})..."
     )

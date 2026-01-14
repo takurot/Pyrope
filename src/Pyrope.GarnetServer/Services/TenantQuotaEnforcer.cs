@@ -7,6 +7,8 @@ namespace Pyrope.GarnetServer.Services
     public interface ITenantQuotaEnforcer
     {
         bool TryBeginRequest(string tenantId, out TenantRequestLease? lease, out string? errorCode, out string? errorMessage);
+        void RecordCost(string tenantId, double cost);
+        bool IsOverBudget(string tenantId);
     }
 
     public sealed class TenantRequestLease : IDisposable
@@ -37,6 +39,7 @@ namespace Pyrope.GarnetServer.Services
         private readonly ITimeProvider _timeProvider;
         private readonly ConcurrentDictionary<string, TenantQpsState> _qpsStates = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, TenantConcurrencyState> _concurrencyStates = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, TenantCostState> _costStates = new(StringComparer.Ordinal);
 
         public TenantQuotaEnforcer(TenantRegistry registry, ITimeProvider timeProvider)
         {
@@ -86,6 +89,51 @@ namespace Pyrope.GarnetServer.Services
             }
 
             return true;
+        }
+
+        public void RecordCost(string tenantId, double cost)
+        {
+            if (cost <= 0) return;
+            var state = _costStates.GetOrAdd(tenantId, _ => new TenantCostState());
+
+            // Simple monthly window logic: simplified to 30 days rolling for now or just monotonic
+            // Since we don't have persistent state, let's just accumulate in-memory with a reset on month change?
+            // For MVP P6-6, we'll just check if current accumulated > budget.
+            // But we need to know when to reset.
+            // Let's use simple logic: Reset if Day difference > 30 (just as placeholder)
+            // Or better: CurrentMonth logic.
+
+            var now = DateTimeOffset.UtcNow;
+            var currentMonth = now.Month;
+            
+            lock (state.Sync)
+            {
+                if (state.Month != currentMonth)
+                {
+                    state.Month = currentMonth;
+                    state.Accumulated = 0;
+                }
+                state.Accumulated += cost;
+            }
+        }
+
+        public bool IsOverBudget(string tenantId)
+        {
+            if (!_registry.TryGet(tenantId, out var config) || config?.Quotas?.MonthlyBudget == null)
+            {
+                return false;
+            }
+
+            if (!_costStates.TryGetValue(tenantId, out var state))
+            {
+                return false;
+            }
+
+            var budget = config.Quotas.MonthlyBudget.Value;
+            lock (state.Sync)
+            {
+                return state.Accumulated > budget;
+            }
         }
 
         private bool TryConsumeQps(string tenantId, int maxQps)
@@ -152,6 +200,13 @@ namespace Pyrope.GarnetServer.Services
         private sealed class TenantConcurrencyState
         {
             public int Current { get; set; }
+            public object Sync { get; } = new();
+        }
+
+        private sealed class TenantCostState
+        {
+            public int Month { get; set; }
+            public double Accumulated { get; set; }
             public object Sync { get; } = new();
         }
     }

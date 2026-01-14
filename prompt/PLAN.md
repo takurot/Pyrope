@@ -176,6 +176,10 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P10-5** | [Ops] | **Multi-Region DR**<br>Cross-region replication for disaster recovery. | P9-2 | [ ] |
 | **P10-6** | [Core] | **Quota Persistence**<br>Persist tenant quota usage (QPS windows, daily request limits) to survive server restarts. Currently in-memory only. | P5-2 | [ ] |
 | **P10-7** | [Security] | **Admin Key Storage (Secret Store)**<br>Support secret stores (Docker secrets, Kubernetes secrets, HashiCorp Vault) or file-based secrets for admin API keys instead of environment variables. | P5-5 | [ ] |
+| **P10-8** | [Core] | **HNSW/IVF-PQ Index Implementation**<br>Replace BruteForceVectorIndex with HNSW (graph-based) or IVF-PQ (quantized). Expect 10-100x latency improvement for large datasets. | P1-1 | [ ] |
+| **P10-9** | [Core] | **SIMD Vector Distance Optimization**<br>Use `System.Runtime.Intrinsics` for SIMD-accelerated distance calculations (L2, Cosine, IP). Expect 4-8x speedup. | P1-1 | [ ] |
+| **P10-10** | [Core] | **Sidecar Communication Optimization**<br>Batch metrics reporting, async fire-and-forget logging, longer policy cache TTL to reduce gRPC overhead. | P4-1 | [ ] |
+| **P10-11** | [Core] | **Memory Pool / Object Reuse**<br>Use `ArrayPool<float>` for vector buffers to reduce GC pressure and stabilize latency. | P1-2 | [ ] |
 
 ---
 

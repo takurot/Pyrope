@@ -1,0 +1,21 @@
+  復元対象のプロジェクトを決定しています...
+  復元対象のすべてのプロジェクトは最新です。
+  Pyrope.GarnetServer -> /Volumes/Storage/src/Pyrope/src/Pyrope.GarnetServer/bin/Debug/net10.0/Pyrope.GarnetServer.dll
+  Pyrope.Benchmarks -> /Volumes/Storage/src/Pyrope/src/Pyrope.Benchmarks/bin/Debug/net10.0/Pyrope.Benchmarks.dll
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(28,104): error CS0234: 型または名前空間の名前 'TimeProvider' が名前空間 'Pyrope.GarnetServer.Services' に存在しません (アセンブリ参照があることを確認してください) [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(116,23): warning CS8600: Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(117,29): warning CS8602: null 参照の可能性があるものの逆参照です。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(137,23): warning CS8600: Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(138,29): warning CS8602: null 参照の可能性があるものの逆参照です。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+
+ビルドに失敗しました。
+
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(116,23): warning CS8600: Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(117,29): warning CS8602: null 参照の可能性があるものの逆参照です。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(137,23): warning CS8600: Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(138,29): warning CS8602: null 参照の可能性があるものの逆参照です。 [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Extensions/CostAwareQueryTests.cs(28,104): error CS0234: 型または名前空間の名前 'TimeProvider' が名前空間 'Pyrope.GarnetServer.Services' に存在しません (アセンブリ参照があることを確認してください) [/Volumes/Storage/src/Pyrope/tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj]
+    4 個の警告
+    1 エラー
+
+経過時間 00:00:02.58

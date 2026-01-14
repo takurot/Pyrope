@@ -4,3 +4,4 @@ protobuf
 scikit-learn
 numpy
 requests
+google-generativeai
