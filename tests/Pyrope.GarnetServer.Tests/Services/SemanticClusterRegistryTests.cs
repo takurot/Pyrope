@@ -13,7 +13,7 @@ namespace Pyrope.GarnetServer.Tests.Services
         {
             var time = new MockTimeProvider();
             var registry = new SemanticClusterRegistry(time);
-            
+
             // Setup centroids
             var centroids = new List<float[]> { new float[] { 1.0f, 0.0f }, new float[] { 0.0f, 1.0f } };
             registry.UpdateCentroids("t1", "idx1", centroids);
@@ -46,7 +46,7 @@ namespace Pyrope.GarnetServer.Tests.Services
         {
             var time = new MockTimeProvider();
             var registry = new SemanticClusterRegistry(time);
-            
+
             registry.UpdateCentroids("t1", "idx1", new List<float[]> { new float[] { 1f } });
 
             // Heat up
@@ -62,7 +62,7 @@ namespace Pyrope.GarnetServer.Tests.Services
             // Should be cold again (lazy reset on next access check or write?
             // GetRecommendedTTL checks window: if (now - WindowStart <= 60). 
             // If advanced 61s, then `now - WindowStart` > 60. Condition fails. Returns baseTTL.
-            
+
             var ttl = registry.GetRecommendedTTL("t1", "idx1", 0, TimeSpan.FromSeconds(60));
             Assert.Equal(TimeSpan.FromSeconds(60), ttl);
         }

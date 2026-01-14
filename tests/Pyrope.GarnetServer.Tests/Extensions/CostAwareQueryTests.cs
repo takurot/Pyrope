@@ -48,34 +48,39 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
         private void RegisterCommands()
         {
-             RegisterCommand("VEC.ADD", VectorCommandType.Add);
-             RegisterCommand("VEC.DEL", VectorCommandType.Del);
-             RegisterCommand("VEC.SEARCH", VectorCommandType.Search);
+            RegisterCommand("VEC.ADD", VectorCommandType.Add);
+            RegisterCommand("VEC.DEL", VectorCommandType.Del);
+            RegisterCommand("VEC.SEARCH", VectorCommandType.Search);
         }
 
         private void RegisterCommand(string name, VectorCommandType type)
         {
-             var cmdSet = new VectorCommandSet(
-                type,
-                resultCache: null,
-                policyEngine: null,
-                metrics: null,
-                lshService: null,
-                quotaEnforcer: _quotaEnforcer,
-                tenantAuthenticator: _tenantAuthenticator
-            );
+            var cmdSet = new VectorCommandSet(
+               type,
+               resultCache: null,
+               policyEngine: null,
+               metrics: null,
+               lshService: null,
+               quotaEnforcer: _quotaEnforcer,
+               tenantAuthenticator: _tenantAuthenticator
+           );
 
-            _server.Register.NewCommand(name, 
+            _server.Register.NewCommand(name,
                 type == VectorCommandType.Search || type == VectorCommandType.Stats ? CommandType.Read : CommandType.ReadModifyWrite,
                 cmdSet,
-                new RespCommandsInfo { Command = (RespCommand)(int)(type switch {
-                    VectorCommandType.Add => VectorCommandSet.VEC_ADD,
-                    VectorCommandType.Upsert => VectorCommandSet.VEC_UPSERT,
-                    VectorCommandType.Del => VectorCommandSet.VEC_DEL,
-                    VectorCommandType.Search => VectorCommandSet.VEC_SEARCH,
-                    VectorCommandType.Stats => VectorCommandSet.VEC_STATS,
-                    _ => 0
-                }), Name = name }
+                new RespCommandsInfo
+                {
+                    Command = (RespCommand)(int)(type switch
+                    {
+                        VectorCommandType.Add => VectorCommandSet.VEC_ADD,
+                        VectorCommandType.Upsert => VectorCommandSet.VEC_UPSERT,
+                        VectorCommandType.Del => VectorCommandSet.VEC_DEL,
+                        VectorCommandType.Search => VectorCommandSet.VEC_SEARCH,
+                        VectorCommandType.Stats => VectorCommandSet.VEC_STATS,
+                        _ => 0
+                    }),
+                    Name = name
+                }
             );
         }
 
@@ -103,19 +108,19 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             // We need to trigger "Over Budget".
             // Since we use accumulated cost, we can search multiple times.
             // First search will record cost.
-            
-            for(int i=0; i<10; i++)
+
+            for (int i = 0; i < 10; i++)
             {
-                 db.Execute("VEC.SEARCH", "tenant_poor", "idx1", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey + "-tenant_poor");
+                db.Execute("VEC.SEARCH", "tenant_poor", "idx1", "TOPK", "1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey + "-tenant_poor");
             }
 
             // 4. Verify Over Budget behavior with TRACE
             var result = db.Execute("VEC.SEARCH", "tenant_poor", "idx1", "TOPK", "1", "VECTOR", "[1,0]", "TRACE", "API_KEY", TenantApiKey + "-tenant_poor");
-            
+
             // Result format: [ [hits], traceJson ]
             var arr = (RedisResult[])result;
             Assert.Equal(2, arr.Length);
-            
+
             var traceJson = arr[1].ToString();
             Assert.Contains("budget_exceeded", traceJson);
             Assert.Contains("BudgetAdjustment", traceJson);
@@ -125,7 +130,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         [Fact]
         public void Search_WhenUnderBudget_NoDegradation()
         {
-             using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
+            using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
             var db = redis.GetDatabase();
             RegisterCommandsReal();
 
@@ -136,16 +141,16 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
             var arr = (RedisResult[])result;
             var traceJson = arr[1].ToString();
-            
+
             // Should NOT contain adjustment or reason
             Assert.DoesNotContain("budget_exceeded", traceJson);
         }
 
         private void RegisterCommandsReal()
         {
-             RegisterCommand("VEC.ADD", VectorCommandType.Add);
-             RegisterCommand("VEC.DEL", VectorCommandType.Del);
-             RegisterCommand("VEC.SEARCH", VectorCommandType.Search);
+            RegisterCommand("VEC.ADD", VectorCommandType.Add);
+            RegisterCommand("VEC.DEL", VectorCommandType.Del);
+            RegisterCommand("VEC.SEARCH", VectorCommandType.Search);
         }
 
         private void EnsureTenant(string tenantId, double budget)
