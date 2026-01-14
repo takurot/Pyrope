@@ -492,14 +492,14 @@ namespace Pyrope.GarnetServer.Extensions
                             {
                                 var roundedK = QueryKey.RoundK(request.TopK);
                                 var l2Key = new QueryKey(request.TenantId, request.IndexName, request.Vector, roundedK, metric, request.FilterTags, null, clusterId);
-                                
+
                                 // P6-7 Semantic TTL adjustment
                                 var ttl = policyDecision.Ttl;
                                 if (ttl.HasValue && _clusterRegistry != null)
                                 {
                                     ttl = _clusterRegistry.GetRecommendedTTL(request.TenantId, request.IndexName, clusterId, ttl.Value);
                                 }
-                                
+
                                 _resultCache.Set(l2Key, json, ttl);
                             }
                         }
@@ -583,7 +583,7 @@ namespace Pyrope.GarnetServer.Extensions
                         Store.Upsert(record);
                         index.Upsert(request.Id, request.Vector);
                     }
-                    
+
                     else
                     {
                         WriteErrorCode(ref output, "ERR Unsupported write command.");

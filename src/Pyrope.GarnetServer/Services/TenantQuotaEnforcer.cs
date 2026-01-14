@@ -101,7 +101,7 @@ namespace Pyrope.GarnetServer.Services
             var now = DateTimeOffset.FromUnixTimeSeconds(nowSeconds);
             var currentYear = now.Year;
             var currentMonth = now.Month;
-            
+
             lock (state.Sync)
             {
                 // FIX: Track year+month to handle year boundaries correctly

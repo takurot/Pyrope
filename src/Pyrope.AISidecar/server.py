@@ -17,6 +17,7 @@ from prediction_engine import PredictionEngine
 
 from llm_worker import LLMWorker
 
+
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def __init__(self, log_path="logs/query_log.jsonl"):
         self._feature_engineer = FeatureEngineer()
@@ -24,12 +25,12 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._prediction_engine = PredictionEngine()
         self._logger = QueryLogger(log_path)
         self._latest_system_features = None
-        self._llm_worker = LLMWorker() # Initialize LLM Worker
+        self._llm_worker = LLMWorker()  # Initialize LLM Worker
 
         # Start background training
         self._training_thread = threading.Thread(target=self._training_loop, daemon=True)
         self._training_thread.start()
-        
+
     def start_background_services(self):
         asyncio.run(self._llm_worker.start())
 
@@ -150,22 +151,22 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     policy_service = PolicyService()
     policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(policy_service, server)
-    
+
     _configure_ports(server, port)
-    
+
     # FIX: Proper async loop management for LLM Worker
     # Create loop and keep reference for clean shutdown
     loop = asyncio.new_event_loop()
     llm_worker = policy_service._llm_worker
-    
+
     def run_async_loop():
         asyncio.set_event_loop(loop)
         loop.run_until_complete(llm_worker.start())
         loop.run_forever()
-    
+
     async_thread = threading.Thread(target=run_async_loop, daemon=True)
     async_thread.start()
-    
+
     print(
         f"Starting AI Sidecar server on port {port} (mTLS={'on' if _parse_bool_env('PYROPE_SIDECAR_MTLS_ENABLED') else 'off'})..."
     )

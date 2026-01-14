@@ -4,20 +4,21 @@ import asyncio
 import os
 from llm_worker import LLMWorker
 
+
 class TestLLMWorker(unittest.TestCase):
 
     def setUp(self):
         # Prevent real API key reading or configuration
         self.patcher = patch.dict(os.environ, {"GEMINI_API_KEY": "fake_key"})
         self.patcher.start()
-        
+
         # Mock genai.configure and GenerativeModel
-        self.genai_patcher = patch('llm_worker.genai')
+        self.genai_patcher = patch("llm_worker.genai")
         self.mock_genai = self.genai_patcher.start()
-        
+
         self.mock_model = MagicMock()
         self.mock_genai.GenerativeModel.return_value = self.mock_model
-        
+
         # Setup AsyncMock for generate_content_async
         self.mock_response = MagicMock()
         self.mock_response.text = "Mocked Response"
@@ -40,18 +41,19 @@ class TestLLMWorker(unittest.TestCase):
     async def async_test_process_task(self):
         worker = LLMWorker(api_key="test_key")
         await worker.start()
-        
+
         callback_result = []
+
         async def callback(text):
             callback_result.append(text)
-            
+
         await worker.submit_task("Hello", callback)
-        
+
         # Give it a moment to process
         await asyncio.sleep(0.1)
-        
+
         await worker.stop()
-        
+
         self.mock_model.generate_content_async.assert_called_with("Hello")
         self.assertEqual(callback_result, ["Mocked Response"])
         self.assertEqual(worker.stats["requests_total"], 1)
@@ -59,5 +61,6 @@ class TestLLMWorker(unittest.TestCase):
     def test_process_task(self):
         asyncio.run(self.async_test_process_task())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

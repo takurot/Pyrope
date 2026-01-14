@@ -102,18 +102,18 @@ namespace Pyrope.GarnetServer.Services
                     var now = _timeProvider.GetUnixTimeSeconds();
                     lock (state.Sync)
                     {
-                         // Check if still hot (within last minute)
-                         if (now - state.WindowStart <= 60)
-                         {
-                             // Threshold: 10 writes per minute -> Hot
-                             if (state.Count > 10)
-                             {
-                                 // Reduce TTL significantly (e.g., 10% of base or fixed 5s)
-                                 var reduced = TimeSpan.FromSeconds(baseTTL.TotalSeconds * 0.1);
-                                 if (reduced < TimeSpan.FromSeconds(1)) reduced = TimeSpan.FromSeconds(1);
-                                 return reduced;
-                             }
-                         }
+                        // Check if still hot (within last minute)
+                        if (now - state.WindowStart <= 60)
+                        {
+                            // Threshold: 10 writes per minute -> Hot
+                            if (state.Count > 10)
+                            {
+                                // Reduce TTL significantly (e.g., 10% of base or fixed 5s)
+                                var reduced = TimeSpan.FromSeconds(baseTTL.TotalSeconds * 0.1);
+                                if (reduced < TimeSpan.FromSeconds(1)) reduced = TimeSpan.FromSeconds(1);
+                                return reduced;
+                            }
+                        }
                     }
                 }
             }
