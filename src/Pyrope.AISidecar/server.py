@@ -153,12 +153,18 @@ def serve():
     
     _configure_ports(server, port)
     
-    # Start LLM Worker in background (fire and forget for now, ideally managed loop)
-    # Since asyncio event loop isn't running in this thread, we need a way to run it.
-    # For now, we'll start it in a separate thread to not block the GRPC server.
+    # FIX: Proper async loop management for LLM Worker
+    # Create loop and keep reference for clean shutdown
     loop = asyncio.new_event_loop()
-    t = threading.Thread(target=lambda: (asyncio.set_event_loop(loop), loop.run_until_complete(policy_service._llm_worker.start()), loop.run_forever()), daemon=True)
-    t.start()
+    llm_worker = policy_service._llm_worker
+    
+    def run_async_loop():
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(llm_worker.start())
+        loop.run_forever()
+    
+    async_thread = threading.Thread(target=run_async_loop, daemon=True)
+    async_thread.start()
     
     print(
         f"Starting AI Sidecar server on port {port} (mTLS={'on' if _parse_bool_env('PYROPE_SIDECAR_MTLS_ENABLED') else 'off'})..."
@@ -168,7 +174,18 @@ def serve():
         while True:
             time.sleep(86400)
     except KeyboardInterrupt:
+        print("Shutting down...")
+        # FIX: Properly stop LLM worker using thread-safe call
+        if llm_worker and loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(llm_worker.stop(), loop)
+            try:
+                future.result(timeout=5.0)
+            except Exception as e:
+                print(f"LLMWorker stop error: {e}")
+            # Stop the event loop
+            loop.call_soon_threadsafe(loop.stop)
         server.stop(0)
+        print("AI Sidecar stopped.")
 
 
 if __name__ == "__main__":

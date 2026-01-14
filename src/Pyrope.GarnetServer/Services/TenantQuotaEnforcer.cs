@@ -96,20 +96,18 @@ namespace Pyrope.GarnetServer.Services
             if (cost <= 0) return;
             var state = _costStates.GetOrAdd(tenantId, _ => new TenantCostState());
 
-            // Simple monthly window logic: simplified to 30 days rolling for now or just monotonic
-            // Since we don't have persistent state, let's just accumulate in-memory with a reset on month change?
-            // For MVP P6-6, we'll just check if current accumulated > budget.
-            // But we need to know when to reset.
-            // Let's use simple logic: Reset if Day difference > 30 (just as placeholder)
-            // Or better: CurrentMonth logic.
-
-            var now = DateTimeOffset.UtcNow;
+            // FIX: Use ITimeProvider for deterministic testing and consistent time source
+            var nowSeconds = _timeProvider.GetUnixTimeSeconds();
+            var now = DateTimeOffset.FromUnixTimeSeconds(nowSeconds);
+            var currentYear = now.Year;
             var currentMonth = now.Month;
             
             lock (state.Sync)
             {
-                if (state.Month != currentMonth)
+                // FIX: Track year+month to handle year boundaries correctly
+                if (state.Year != currentYear || state.Month != currentMonth)
                 {
+                    state.Year = currentYear;
                     state.Month = currentMonth;
                     state.Accumulated = 0;
                 }
@@ -205,6 +203,7 @@ namespace Pyrope.GarnetServer.Services
 
         private sealed class TenantCostState
         {
+            public int Year { get; set; }
             public int Month { get; set; }
             public double Accumulated { get; set; }
             public object Sync { get; } = new();
