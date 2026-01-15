@@ -82,7 +82,7 @@ namespace Pyrope.GarnetServer.Services
                 Metric = metric;
                 // Use DeltaVectorIndex by default to exercise the new path
                 var head = new BruteForceVectorIndex(dimension, metric);
-                var tail = new BruteForceVectorIndex(dimension, metric);
+                var tail = new IvfFlatVectorIndex(dimension, metric);
                 Index = new DeltaVectorIndex(head, tail);
             }
 

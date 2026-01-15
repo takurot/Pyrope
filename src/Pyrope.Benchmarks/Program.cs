@@ -123,7 +123,23 @@ public static class Program
             options.UseBinaryPayload);
 
         Console.WriteLine($"[Pyrope.Benchmarks] Loaded={load.Loaded} elapsed={load.Elapsed.TotalSeconds:F2}s throughput={load.Throughput:0.0} vec/s");
+        Console.WriteLine($"[Pyrope.Benchmarks] Loaded={load.Loaded} elapsed={load.Elapsed.TotalSeconds:F2}s throughput={load.Throughput:0.0} vec/s");
         Console.WriteLine();
+
+        if (options.BuildIndex && !string.IsNullOrWhiteSpace(options.HttpBaseUrl))
+        {
+            Console.WriteLine("[Pyrope.Benchmarks] Triggering Index Build (Compaction)...");
+            await BuildIndexAsync(options.HttpBaseUrl!, options.AdminApiKey!, options.TenantId, options.IndexName);
+            Console.WriteLine("[Pyrope.Benchmarks] Build triggered.");
+            // Wait a bit for build to finish? It's sync in the controller (calls index.Build() which locks), 
+            // but the HTTP call waits for it.
+            // But if it takes distinct time, fine.
+            Console.WriteLine();
+        }
+        else if (options.BuildIndex)
+        {
+             Console.WriteLine("[Pyrope.Benchmarks] Warning: --build-index ignored because --http is missing.");
+        }
 
         // 2) Warmup
         if (options.Warmup > 0)
@@ -425,6 +441,17 @@ public static class Program
         res.EnsureSuccessStatusCode();
     }
 
+    private static async Task BuildIndexAsync(string httpBaseUrl, string adminApiKey, string tenantId, string indexName)
+    {
+        var baseUri = httpBaseUrl.EndsWith("/", StringComparison.Ordinal) ? httpBaseUrl : httpBaseUrl + "/";
+        using var http = new HttpClient { BaseAddress = new Uri(baseUri) };
+        http.DefaultRequestHeaders.Add("X-API-KEY", adminApiKey);
+
+        // POST /v1/indexes/{tenantId}/{indexName}/build
+        var res = await http.PostAsync($"v1/indexes/{tenantId}/{indexName}/build", content: null);
+        res.EnsureSuccessStatusCode();
+    }
+
     private static bool TryParseArgs(string[] args, out Options options, out string error)
     {
         var map = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -480,6 +507,7 @@ public static class Program
         options.UniqueQueries = TryGetInt(map, "--unique-queries", options.UniqueQueries);
         options.Repeat = TryGetInt(map, "--repeat", options.Repeat);
         options.Sequence = map.ContainsKey("--sequence");
+        options.BuildIndex = map.ContainsKey("--build-index");
 
         var payload = map.TryGetValue("--payload", out var payloadValue) ? payloadValue : null;
         if (!string.IsNullOrWhiteSpace(payload))
@@ -600,6 +628,7 @@ public static class Program
         public int UniqueQueries { get; set; }
         public int Repeat { get; set; } = 1;
         public bool Sequence { get; set; }
+        public bool BuildIndex { get; set; }
     }
 
     private sealed record LoadResult(int Loaded, TimeSpan Elapsed, double Throughput);

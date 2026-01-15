@@ -151,6 +151,24 @@ namespace Pyrope.GarnetServer.Vector
             }
         }
 
+        public IEnumerable<KeyValuePair<string, float[]>> Scan()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                // Return copy or direct reference? 
+                // Creating new KVPs to be safe from modification during iteration if lock is released,
+                // but caller should handle concurrency or we yield inside lock?
+                // Yielding inside ReadLock is risky if caller delays.
+                // Snapshotting list is safer.
+                return _entries.Select(kvp => new KeyValuePair<string, float[]>(kvp.Key, kvp.Value.Vector)).ToList();
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
         public IReadOnlyList<SearchResult> Search(float[] query, int topK, SearchOptions? options = null)
         {
             ValidateVector(query);
