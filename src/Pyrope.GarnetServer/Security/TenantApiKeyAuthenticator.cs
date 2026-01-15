@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
 
 namespace Pyrope.GarnetServer.Security
@@ -6,15 +7,22 @@ namespace Pyrope.GarnetServer.Security
     public sealed class TenantApiKeyAuthenticator : ITenantAuthenticator
     {
         private readonly TenantRegistry _registry;
+        private readonly ApiKeyAuthOptions _options;
 
-        public TenantApiKeyAuthenticator(TenantRegistry registry)
+        public TenantApiKeyAuthenticator(TenantRegistry registry, IOptions<ApiKeyAuthOptions> options)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         }
 
         public bool TryAuthenticate(string tenantId, string? apiKey, out string? errorMessage)
         {
             errorMessage = null;
+
+            if (!_options.Enabled)
+            {
+                return true;
+            }
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -44,4 +52,3 @@ namespace Pyrope.GarnetServer.Security
         }
     }
 }
-

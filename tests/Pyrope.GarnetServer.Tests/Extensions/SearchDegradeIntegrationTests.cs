@@ -3,6 +3,7 @@ using Garnet;
 using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Security;
+using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
 using Pyrope.GarnetServer.Vector;
 using StackExchange.Redis;
@@ -21,7 +22,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
         public SearchDegradeIntegrationTests()
         {
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _tenantRegistry.TryCreate("t_degrade", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             _guardrails = new AlwaysDegradeGuardrails();

@@ -22,6 +22,9 @@ namespace Pyrope.GarnetServer.Vector
         private List<float[]> _centroids = new();
         private Dictionary<int, List<KeyValuePair<string, VectorEntry>>> _invertedLists = new();
 
+        // Cached Centroid Norms (Optimization for Cosine)
+        private List<float> _centroidNorms = new();
+
         public IvfFlatVectorIndex(int dimension, VectorMetric metric, int nList = 100)
         {
             if (dimension <= 0) throw new ArgumentOutOfRangeException(nameof(dimension));
@@ -41,21 +44,6 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterWriteLock();
             try
             {
-                // For simplicity in this implementation, everything goes to buffer first.
-                // If we are already built, we could assign to cluster immediately (Online IVF),
-                // but the prompt implies a batch-built Tail index. 
-                // However, to support real-time updates without rebuilding constantly, 
-                // we'll stick to: Updates -> Buffer.
-                // Re-Build clears buffer and reclusters everything.
-
-                // If ID exists in buffer, update it.
-                // If ID exists in clusters, we should technically remove it or mark it.
-                // But efficient delete in IVF is hard. 
-                // Logic: "Add" overwrites. 
-                // We'll add to Buffer. Search checks Buffer first. 
-                // If duplicates exist in index, we might return them unless we filter.
-                // For now, let's just use the Buffer as the write path.
-
                 var entry = CreateEntry(vector);
                 _buffer[id] = entry;
             }
@@ -77,11 +65,6 @@ namespace Pyrope.GarnetServer.Vector
             try
             {
                 bool mostlyremoved = _buffer.Remove(id);
-                // Also need to remove from built index if present.
-                // This is O(N) without an ID->Cluster map.
-                // For a Tail index, deletes might be rare or batch handled.
-                // We will implement a lazy scan or just "Best Effort" from buffer.
-                // To do it correctly:
                 if (_isBuilt)
                 {
                     // Slow path: find and remove
@@ -104,37 +87,53 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterWriteLock();
             try
             {
-                // 1. Gather all vectors (Buffer + Existing Clusters)
-                var allData = new List<KeyValuePair<string, VectorEntry>>();
-                allData.AddRange(_buffer);
+                // 1. Gather all vectors (Deduplicating: Buffer wins)
+                var uniqueData = new Dictionary<string, VectorEntry>();
+
+                // First add existing index data
                 if (_isBuilt)
                 {
                     foreach (var list in _invertedLists.Values)
                     {
-                        allData.AddRange(list);
+                        foreach (var item in list)
+                        {
+                            uniqueData[item.Key] = item.Value;
+                        }
                     }
                 }
 
-                if (allData.Count == 0) return;
+                // Then overwrite/add buffer data
+                foreach (var kvp in _buffer)
+                {
+                    uniqueData[kvp.Key] = kvp.Value;
+                }
+
+                if (uniqueData.Count == 0) return;
+
+                var allVectors = uniqueData.Select(x => x.Value.Vector).ToList();
 
                 // 2. Train KMeans
-                int k = Math.Min(_nList, allData.Count);
+                int k = Math.Min(_nList, uniqueData.Count);
                 if (k <= 0) k = 1;
 
-                var centroids = TrainKMeans(allData.Select(x => x.Value.Vector).ToList(), k);
+                var centroids = TrainKMeans(allVectors, k);
+                
+                // Precompile centroid norms for faster assignment/search if needed
+                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? ComputeNorm(c) : 0f).ToList();
 
                 // 3. Assign
                 var newLists = new Dictionary<int, List<KeyValuePair<string, VectorEntry>>>();
                 for (int i = 0; i < k; i++) newLists[i] = new List<KeyValuePair<string, VectorEntry>>();
 
-                foreach (var item in allData)
+                foreach (var item in uniqueData)
                 {
-                    int bestC = FindNearestCentroid(item.Value.Vector, centroids);
+                    int bestC = FindNearestCentroid(item.Value.Vector, centroids, cNorms);
                     newLists[bestC].Add(item);
                 }
 
                 // 4. Commit
                 _centroids = centroids;
+                _centroidNorms = cNorms;
                 _invertedLists = newLists;
                 _buffer.Clear();
                 _isBuilt = true;
@@ -149,12 +148,13 @@ namespace Pyrope.GarnetServer.Vector
         {
             ValidateVector(query);
 
-            int nProbe = CombineNProbe; // Default
+            int nProbe = CombineNProbe;
             int maxScans = int.MaxValue;
+
             if (options != null)
             {
                 if (options.MaxScans.HasValue) maxScans = options.MaxScans.Value;
-                // Could allow option to override nProbe if we added it to SearchOptions
+                if (options.NProbe.HasValue) nProbe = options.NProbe.Value;
             }
 
             _lock.EnterReadLock();
@@ -162,10 +162,14 @@ namespace Pyrope.GarnetServer.Vector
             {
                 var heap = new PriorityQueue<SearchResult, float>();
                 var seenIds = new HashSet<string>();
+                int scanned = 0;
 
                 // 1. Search Buffer (Exact)
                 foreach (var kvp in _buffer)
                 {
+                    if (scanned >= maxScans) break;
+                    scanned++;
+
                     float score = ComputeScore(query, kvp.Value);
                     heap.Enqueue(new SearchResult(kvp.Key, score), score);
                     seenIds.Add(kvp.Key);
@@ -174,14 +178,15 @@ namespace Pyrope.GarnetServer.Vector
                 }
 
                 // 2. Search Index (Approx)
-                if (_isBuilt && _centroids.Count > 0)
+                if (_isBuilt && _centroids.Count > 0 && scanned < maxScans)
                 {
                     // Find nearest nProbe centroids
                     var centroidScores = new List<(int Index, float Score)>();
                     for (int i = 0; i < _centroids.Count; i++)
                     {
-                        float s = ComputeScore(query, new VectorEntry(_centroids[i], 0)); // Norm not needed for centroid selection usually? Or used?
-                        // Actually ComputeScore handles standard metric logic.
+                        // Use precomputed norm for centroids
+                        var cEntry = new VectorEntry(_centroids[i], _centroidNorms[i]);
+                        float s = ComputeScore(query, cEntry);
                         centroidScores.Add((i, s));
                     }
 
@@ -189,7 +194,6 @@ namespace Pyrope.GarnetServer.Vector
                     centroidScores.Sort((a, b) => b.Score.CompareTo(a.Score));
 
                     int probes = Math.Min(nProbe, centroidScores.Count);
-                    int scanned = 0;
 
                     for (int i = 0; i < probes; i++)
                     {
@@ -235,9 +239,8 @@ namespace Pyrope.GarnetServer.Vector
                     Metric = Metric,
                     IsBuilt = _isBuilt,
                     Centroids = _centroids,
-                    // Serialize Buffer
+                    CentroidNorms = _centroidNorms,
                     Buffer = _buffer.ToDictionary(k => k.Key, v => new VectorEntryDto { Vector = v.Value.Vector, Norm = v.Value.Norm }),
-                    // Serialize Inverted Lists
                     InvertedLists = _invertedLists.ToDictionary(
                         k => k.Key.ToString(),
                         v => v.Value.Select(x => new KeyedVectorDto { Id = x.Key, Vector = x.Value.Vector, Norm = x.Value.Norm }).ToList()
@@ -264,9 +267,9 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterWriteLock();
             try
             {
-                // Validate dimension/metric match if needed
                 _isBuilt = state.IsBuilt;
                 _centroids = state.Centroids ?? new List<float[]>();
+                _centroidNorms = state.CentroidNorms ?? new List<float>();
 
                 _buffer.Clear();
                 if (state.Buffer != null)
@@ -316,29 +319,37 @@ namespace Pyrope.GarnetServer.Vector
 
             if (centroids.Count < k)
             {
-                // Pad with zeros if not enough data? Or just reduce k?
-                // Logic above ensures k <= data.Count
+                // Edge case: fewer data points than k
+                // Just keep what we have
             }
 
             int maxIter = 10;
+            // Precompute L2 norms needed? 
+            // Standard KMeans uses Euclidean distance (L2) regardless of target metric usually, 
+            // but for Cosine similarity search, Spherical K-Means is better.
+            // For MVP, we stick to standard KMeans (L2 minimizes variance).
+
             for (int iter = 0; iter < maxIter; iter++)
             {
                 var clusters = new List<float[]>[k];
                 for (int i = 0; i < k; i++) clusters[i] = new List<float[]>();
 
                 bool changed = false;
+                
+                // Temp norms for centroids during training iteration
+                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? ComputeNorm(c) : 0f).ToList();
 
                 // Assign
                 foreach (var vec in data)
                 {
-                    int best = FindNearestCentroid(vec, centroids);
+                    int best = FindNearestCentroid(vec, centroids, cNorms);
                     clusters[best].Add(vec);
                 }
 
                 // Update
                 for (int i = 0; i < k; i++)
                 {
-                    if (clusters[i].Count == 0) continue; // Keep old centroid if empty
+                    if (clusters[i].Count == 0) continue;
 
                     var newC = new float[Dimension];
                     foreach (var vec in clusters[i])
@@ -347,7 +358,6 @@ namespace Pyrope.GarnetServer.Vector
                     }
                     for (int d = 0; d < Dimension; d++) newC[d] /= clusters[i].Count;
 
-                    // Check change
                     if (!ArraysEqual(centroids[i], newC))
                     {
                         centroids[i] = newC;
@@ -368,34 +378,29 @@ namespace Pyrope.GarnetServer.Vector
             return true;
         }
 
-        private int FindNearestCentroid(float[] vec, List<float[]> centroids)
+        private int FindNearestCentroid(float[] vec, List<float[]> centroids, List<float> centroidNorms)
         {
             int bestIndex = 0;
-            float bestDist = Metric == VectorMetric.L2 ? float.MaxValue : float.MinValue;
+            // Fix: Initialize bestDist correctly based on metric
+            // ComputeScore returns a score where Higher is Better.
+            // So we start with MinValue.
+            float bestScore = float.MinValue;
 
             for (int i = 0; i < centroids.Count; i++)
             {
-                // Centroids are just vectors, use same metric
-                // For K-Means, strictly L2 is standard for centroid update logic (mean).
-                // But for assignment in metric space, we should use the Metric.
-                // However, averaging vectors only minimizes L2 variance. 
-                // Using Cosine metric with simple averaging is Spherical K-Means roughly.
-                // For this MVP, we use L2 logic or generic score logic.
-                // Let's use generic score:
+                // Fix: Pass centroid norm
+                float score = ComputeScore(vec, new VectorEntry(centroids[i], centroidNorms[i]));
 
-                // Note: VectorEntry wrapper needed for ComputeScore
-                float score = ComputeScore(vec, new VectorEntry(centroids[i], 0));
-
-                if (score > bestDist) // Higher score is better in our system
+                if (score > bestScore)
                 {
-                    bestDist = score;
+                    bestScore = score;
                     bestIndex = i;
                 }
             }
             return bestIndex;
         }
 
-        // Helpers copied/adapted from BruteForce logic
+        // Helpers
         private void ValidateVector(float[] vector)
         {
             if (vector == null) throw new ArgumentNullException(nameof(vector));
@@ -462,6 +467,7 @@ namespace Pyrope.GarnetServer.Vector
             public VectorMetric Metric { get; set; }
             public bool IsBuilt { get; set; }
             public List<float[]> Centroids { get; set; }
+            public List<float> CentroidNorms { get; set; }
             public Dictionary<string, VectorEntryDto> Buffer { get; set; }
             public Dictionary<string, List<KeyedVectorDto>> InvertedLists { get; set; }
         }

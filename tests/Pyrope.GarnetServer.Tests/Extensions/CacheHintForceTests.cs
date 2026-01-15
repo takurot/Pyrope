@@ -8,6 +8,8 @@ using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
+using Microsoft.Extensions.Options;
+
 namespace Pyrope.GarnetServer.Tests.Extensions
 {
     public sealed class CacheHintForceTests : IDisposable
@@ -20,7 +22,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
         public CacheHintForceTests()
         {
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _tenantRegistry.TryCreate("t_slo", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             _port = 6000 + new Random().Next(1000);

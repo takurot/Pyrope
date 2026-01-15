@@ -5,6 +5,7 @@ using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
 using Pyrope.GarnetServer.Security;
+using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
@@ -24,7 +25,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         {
             _port = 4000 + new Random().Next(1000);
             _cacheStorage = new MemoryCacheStorage();
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
 
             EnsureTenant("t_cache1");
             EnsureTenant("t_cache2");

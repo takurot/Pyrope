@@ -8,6 +8,8 @@ using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
+using Microsoft.Extensions.Options;
+
 namespace Pyrope.GarnetServer.Tests
 {
     public class CommandRegistryTests : IDisposable
@@ -21,7 +23,7 @@ namespace Pyrope.GarnetServer.Tests
         public CommandRegistryTests()
         {
             _port = 3278 + new Random().Next(1000);
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
 
             EnsureTenant("tenant1");
             EnsureTenant("tenant_search1");
