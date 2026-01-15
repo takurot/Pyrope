@@ -20,7 +20,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
 
             // Before build, it might behave like brute force on buffer
             var results = index.Search(new float[] { 1f, 0f }, 1);
-            
+
             Assert.Single(results);
             Assert.Equal("a", results[0].Id);
         }
@@ -32,7 +32,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
             // Cluster A: around (0,0)
             index.Add("a1", new float[] { 0.1f, 0.1f });
             index.Add("a2", new float[] { 0.2f, 0.2f });
-            
+
             // Cluster B: around (10,10)
             index.Add("b1", new float[] { 10.1f, 10.1f });
             index.Add("b2", new float[] { 10.2f, 10.2f });
@@ -42,7 +42,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
             // After build, search for (0,0) should return a1 or a2
             // And implicitly we want to know if it pruned the search space, but that's hard to test purely functionally.
             // We mainly check recall here.
-            
+
             var results = index.Search(new float[] { 0f, 0f }, 2, new SearchOptions(MaxScans: null));
             Assert.Equal(2, results.Count);
             Assert.Contains(results, r => r.Id.StartsWith("a"));
@@ -66,10 +66,10 @@ namespace Pyrope.GarnetServer.Tests.Vector
             // Query between c1 and c2, but closer to c1. 
             // If we only search nearest cluster, we might miss c2 if it ended up in a different cluster 
             // but the query was on the boundary.
-            
+
             // Hard to deterministically test boundary conditions with simple K-Means without seeds.
             // Instead, just ensure nProbe=NList returns everything.
-            
+
             index.CombineNProbe = 3;
             var results = index.Search(new float[] { 0f, 0f }, 3);
             Assert.Equal(3, results.Count);

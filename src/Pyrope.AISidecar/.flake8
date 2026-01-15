@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 120
+ignore = E501, W503
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    policy_service_pb2.py,
+    policy_service_pb2_grpc.py

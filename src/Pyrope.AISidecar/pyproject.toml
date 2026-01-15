@@ -1,0 +1,8 @@
+[tool.black]
+line-length = 120
+extend-exclude = '''
+(
+  policy_service_pb2.py  # Generated protobuf file
+  | policy_service_pb2_grpc.py  # Generated protobuf file
+)
+'''

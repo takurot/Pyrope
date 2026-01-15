@@ -138,7 +138,7 @@ public static class Program
         }
         else if (options.BuildIndex)
         {
-             Console.WriteLine("[Pyrope.Benchmarks] Warning: --build-index ignored because --http is missing.");
+            Console.WriteLine("[Pyrope.Benchmarks] Warning: --build-index ignored because --http is missing.");
         }
 
         // 2) Warmup

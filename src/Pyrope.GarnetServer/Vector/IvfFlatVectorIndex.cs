@@ -9,7 +9,7 @@ namespace Pyrope.GarnetServer.Vector
     public class IvfFlatVectorIndex : IVectorIndex
     {
         private readonly ReaderWriterLockSlim _lock = new();
-        
+
         // Configuration
         private readonly int _nList; // Target number of clusters
         public int CombineNProbe { get; set; } = 3; // How many clusters to search
@@ -47,7 +47,7 @@ namespace Pyrope.GarnetServer.Vector
                 // However, to support real-time updates without rebuilding constantly, 
                 // we'll stick to: Updates -> Buffer.
                 // Re-Build clears buffer and reclusters everything.
-                
+
                 // If ID exists in buffer, update it.
                 // If ID exists in clusters, we should technically remove it or mark it.
                 // But efficient delete in IVF is hard. 
@@ -55,7 +55,7 @@ namespace Pyrope.GarnetServer.Vector
                 // We'll add to Buffer. Search checks Buffer first. 
                 // If duplicates exist in index, we might return them unless we filter.
                 // For now, let's just use the Buffer as the write path.
-                
+
                 var entry = CreateEntry(vector);
                 _buffer[id] = entry;
             }
@@ -120,12 +120,12 @@ namespace Pyrope.GarnetServer.Vector
                 // 2. Train KMeans
                 int k = Math.Min(_nList, allData.Count);
                 if (k <= 0) k = 1;
-                
+
                 var centroids = TrainKMeans(allData.Select(x => x.Value.Vector).ToList(), k);
 
                 // 3. Assign
                 var newLists = new Dictionary<int, List<KeyValuePair<string, VectorEntry>>>();
-                for(int i=0; i<k; i++) newLists[i] = new List<KeyValuePair<string, VectorEntry>>();
+                for (int i = 0; i < k; i++) newLists[i] = new List<KeyValuePair<string, VectorEntry>>();
 
                 foreach (var item in allData)
                 {
@@ -164,12 +164,12 @@ namespace Pyrope.GarnetServer.Vector
                 var seenIds = new HashSet<string>();
 
                 // 1. Search Buffer (Exact)
-                foreach(var kvp in _buffer)
+                foreach (var kvp in _buffer)
                 {
                     float score = ComputeScore(query, kvp.Value);
                     heap.Enqueue(new SearchResult(kvp.Key, score), score);
                     seenIds.Add(kvp.Key);
-                    
+
                     if (heap.Count > topK) heap.Dequeue();
                 }
 
@@ -214,7 +214,7 @@ namespace Pyrope.GarnetServer.Vector
 
                 // Unload Heap
                 var results = new List<SearchResult>(heap.Count);
-                while(heap.Count > 0) results.Add(heap.Dequeue());
+                while (heap.Count > 0) results.Add(heap.Dequeue());
                 results.Sort((a, b) => b.Score.CompareTo(a.Score));
                 return results;
             }
@@ -226,7 +226,7 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Snapshot(string path)
         {
-             _lock.EnterReadLock();
+            _lock.EnterReadLock();
             try
             {
                 var state = new IvfStateDto
@@ -239,7 +239,7 @@ namespace Pyrope.GarnetServer.Vector
                     Buffer = _buffer.ToDictionary(k => k.Key, v => new VectorEntryDto { Vector = v.Value.Vector, Norm = v.Value.Norm }),
                     // Serialize Inverted Lists
                     InvertedLists = _invertedLists.ToDictionary(
-                        k => k.Key.ToString(), 
+                        k => k.Key.ToString(),
                         v => v.Value.Select(x => new KeyedVectorDto { Id = x.Key, Vector = x.Value.Vector, Norm = x.Value.Norm }).ToList()
                     )
                 };
@@ -267,18 +267,18 @@ namespace Pyrope.GarnetServer.Vector
                 // Validate dimension/metric match if needed
                 _isBuilt = state.IsBuilt;
                 _centroids = state.Centroids ?? new List<float[]>();
-                
+
                 _buffer.Clear();
                 if (state.Buffer != null)
                 {
-                    foreach(var kvp in state.Buffer)
+                    foreach (var kvp in state.Buffer)
                         _buffer[kvp.Key] = new VectorEntry(kvp.Value.Vector, kvp.Value.Norm);
                 }
 
                 _invertedLists.Clear();
                 if (state.InvertedLists != null)
                 {
-                    foreach(var kvp in state.InvertedLists)
+                    foreach (var kvp in state.InvertedLists)
                     {
                         int cIdx = int.Parse(kvp.Key);
                         var list = kvp.Value.Select(x => new KeyValuePair<string, VectorEntry>(x.Id, new VectorEntry(x.Vector, x.Norm))).ToList();
@@ -324,7 +324,7 @@ namespace Pyrope.GarnetServer.Vector
             for (int iter = 0; iter < maxIter; iter++)
             {
                 var clusters = new List<float[]>[k];
-                for(int i=0; i<k; i++) clusters[i] = new List<float[]>();
+                for (int i = 0; i < k; i++) clusters[i] = new List<float[]>();
 
                 bool changed = false;
 
@@ -363,7 +363,7 @@ namespace Pyrope.GarnetServer.Vector
         private bool ArraysEqual(float[] a, float[] b)
         {
             if (a.Length != b.Length) return false;
-            for(int i=0; i<a.Length; i++)
+            for (int i = 0; i < a.Length; i++)
                 if (Math.Abs(a[i] - b[i]) > 1e-6) return false;
             return true;
         }
@@ -382,10 +382,10 @@ namespace Pyrope.GarnetServer.Vector
                 // Using Cosine metric with simple averaging is Spherical K-Means roughly.
                 // For this MVP, we use L2 logic or generic score logic.
                 // Let's use generic score:
-                
+
                 // Note: VectorEntry wrapper needed for ComputeScore
-                float score = ComputeScore(vec, new VectorEntry(centroids[i], 0)); 
-                
+                float score = ComputeScore(vec, new VectorEntry(centroids[i], 0));
+
                 if (score > bestDist) // Higher score is better in our system
                 {
                     bestDist = score;
@@ -394,7 +394,7 @@ namespace Pyrope.GarnetServer.Vector
             }
             return bestIndex;
         }
-        
+
         // Helpers copied/adapted from BruteForce logic
         private void ValidateVector(float[] vector)
         {

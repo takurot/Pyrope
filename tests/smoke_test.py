@@ -118,7 +118,7 @@ def run_smoke_test(host, port):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Pyrope Smoke Test')
     parser.add_argument('--host', default='127.0.0.1', help='Garnet host')
-    parser.add_argument('--port', type=int, default=3278, help='Garnet port')
+    parser.add_argument('--port', type=int, default=6379, help='Garnet port')
     args = parser.parse_args()
 
     success = run_smoke_test(args.host, args.port)
