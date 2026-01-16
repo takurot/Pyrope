@@ -201,7 +201,17 @@ def _configure_ports(server: grpc.Server, port: int) -> None:
 def serve():
     port = int(os.getenv("PYROPE_SIDECAR_PORT", "50051"))
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    policy_service = PolicyService()
+    
+    print("DEBUG: Initializing PolicyService...", flush=True)
+    try:
+        policy_service = PolicyService()
+        print("DEBUG: PolicyService initialized successfully.", flush=True)
+    except Exception as e:
+        print(f"CRITICAL ERROR initializing PolicyService: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+        
     policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(policy_service, server)
 
     _configure_ports(server, port)
