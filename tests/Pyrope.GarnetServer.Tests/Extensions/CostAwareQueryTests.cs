@@ -10,6 +10,8 @@ using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
+using Microsoft.Extensions.Options;
+
 namespace Pyrope.GarnetServer.Tests.Extensions
 {
     public class CostAwareQueryTests : IDisposable
@@ -24,7 +26,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         public CostAwareQueryTests()
         {
             _port = 4500 + new Random().Next(1000);
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _quotaEnforcer = new TenantQuotaEnforcer(_tenantRegistry, new Pyrope.GarnetServer.Services.SystemTimeProvider());
 
             // Setup tenant with LOW budget

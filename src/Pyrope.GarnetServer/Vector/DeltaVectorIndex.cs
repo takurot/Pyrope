@@ -123,8 +123,27 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Build()
         {
-            _head.Build();
-            _tail.Build();
+            _lock.EnterWriteLock();
+            try
+            {
+                // Compact: Move items from Head -> Tail
+                if (_head is BruteForceVectorIndex bfHead)
+                {
+                    var items = bfHead.Scan();
+                    foreach (var kvp in items)
+                    {
+                        _tail.Add(kvp.Key, kvp.Value);
+                        _head.Delete(kvp.Key);
+                    }
+                }
+
+                _head.Build();
+                _tail.Build();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         public void Snapshot(string path)

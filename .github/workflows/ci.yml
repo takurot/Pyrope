@@ -63,16 +63,16 @@ jobs:
           pip install flake8 black
 
       - name: Lint with flake8
-        run: flake8 . --max-line-length=120 --ignore=E501,W503
+        run: flake8 .
 
       - name: Format Check with black
-        run: black --check --line-length 120 .
+        run: black --check .
 
   smoke-test:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: false  # Disabled until server startup in CI is fixed
-    continue-on-error: true  # Allow failure for now
+    # if: false  # Disabled until server startup in CI is fixed
+    # continue-on-error: true  # Allow failure for now
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,12 +96,14 @@ jobs:
         run: dotnet build src/Pyrope.GarnetServer/Pyrope.GarnetServer.csproj --configuration Release
 
       - name: Start Server
+        env:
+          Auth__Enabled: "false"
         run: |
-          dotnet run --project src/Pyrope.GarnetServer/Pyrope.GarnetServer.csproj --configuration Release &
-          sleep 10  # Wait for server to start
+          dotnet run --project src/Pyrope.GarnetServer/Pyrope.GarnetServer.csproj --configuration Release -- --port 3278 &
+          sleep 15  # Wait for server to start
 
       - name: Run Smoke Test
-        run: python tests/smoke_test.py
+        run: python tests/smoke_test.py --port 3278
         timeout-minutes: 2
 
   security-scan:

@@ -25,7 +25,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var lowKey = ApiKey + "-low";
             _registry.TryCreate("t_high", new TenantQuota { Priority = 0 }, out _, apiKey: highKey);
             _registry.TryCreate("t_low", new TenantQuota { Priority = 2 }, out _, apiKey: lowKey);
-            _auth = new TenantApiKeyAuthenticator(_registry);
+            _auth = new TenantApiKeyAuthenticator(_registry, Options.Create(new ApiKeyAuthOptions()));
 
             var options = Options.Create(new SloGuardrailsOptions
             {

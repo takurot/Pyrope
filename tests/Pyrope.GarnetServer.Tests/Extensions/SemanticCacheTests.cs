@@ -3,6 +3,7 @@ using System.Text;
 using StackExchange.Redis;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Security;
+using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
 using Xunit;
 
@@ -22,7 +23,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var port = 3278 + new Random().Next(1000); // Random port to avoid collision
             _server = new Garnet.GarnetServer(new string[] { "--port", port.ToString(), "--bind", "127.0.0.1" });
 
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _tenantRegistry.TryCreate("tenant_sem", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             // Manual registration to include LSH

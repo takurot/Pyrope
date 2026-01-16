@@ -4,6 +4,7 @@ using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
 using Pyrope.GarnetServer.Security;
+using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
@@ -24,7 +25,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var cacheStorage = new MemoryCacheStorage();
             var resultCache = new ResultCache(cacheStorage, VectorCommandSet.SharedIndexRegistry);
             var policyEngine = new StaticPolicyEngine(TimeSpan.FromSeconds(60));
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _tenantRegistry.TryCreate("t_trace", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             try

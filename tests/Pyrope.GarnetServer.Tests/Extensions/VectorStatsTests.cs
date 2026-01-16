@@ -9,6 +9,8 @@ using Pyrope.GarnetServer.Services;
 using StackExchange.Redis;
 using Xunit;
 
+using Microsoft.Extensions.Options;
+
 namespace Pyrope.GarnetServer.Tests.Extensions
 {
     public class VectorStatsTests : IDisposable
@@ -22,7 +24,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         public VectorStatsTests()
         {
             _port = 5000 + new Random().Next(1000);
-            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry);
+            _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, Options.Create(new ApiKeyAuthOptions()));
             _tenantRegistry.TryCreate("t_stats", new TenantQuota(), out _, apiKey: TenantApiKey);
 
             // Shared components
