@@ -77,9 +77,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
                 cpu_utilization=request.cpu_utilization,
                 gpu_utilization=request.gpu_utilization,
             )
-            future = asyncio.run_coroutine_threadsafe(
-                self._llm_policy_engine.compute_policy(metrics), self._event_loop
-            )
+            future = asyncio.run_coroutine_threadsafe(self._llm_policy_engine.compute_policy(metrics), self._event_loop)
             try:
                 policy_config = future.result(timeout=5.0)
             except Exception as e:

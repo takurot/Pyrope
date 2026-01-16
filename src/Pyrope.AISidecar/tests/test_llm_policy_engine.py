@@ -3,6 +3,7 @@ TDD Tests for LLMPolicyEngine (P6-13: Gemini Cache Control)
 
 Red Phase: These tests define the expected behavior before implementation.
 """
+
 import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
@@ -44,9 +45,7 @@ class TestLLMPolicyEnginePromptGeneration(unittest.TestCase):
             cpu_utilization=60.0,
             gpu_utilization=20.0,
         )
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
-        )
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
         prompt = engine._build_prompt(metrics)
 
         self.assertIn("100", prompt)  # QPS
@@ -58,9 +57,7 @@ class TestLLMPolicyEnginePromptGeneration(unittest.TestCase):
     def test_prompt_requests_json_output(self):
         """Prompt should request structured JSON output."""
         metrics = SystemMetrics()
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
-        )
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
         prompt = engine._build_prompt(metrics)
 
         self.assertIn("ttl_seconds", prompt)
@@ -77,9 +74,7 @@ class TestLLMPolicyEngineResponseParsing(unittest.TestCase):
 
     def test_parse_valid_json_response(self):
         """Should parse valid JSON into PolicyConfig."""
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
-        )
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
         response = '{"ttl_seconds": 120, "admission_threshold": 0.2, "eviction_priority": 1}'
 
         config = engine._parse_response(response)
@@ -90,10 +85,10 @@ class TestLLMPolicyEngineResponseParsing(unittest.TestCase):
 
     def test_parse_json_with_extra_text(self):
         """Should extract JSON from response with surrounding text."""
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
+        response = (
+            'Based on the metrics, I recommend: {"ttl_seconds": 60, "admission_threshold": 0.1, "eviction_priority": 0}'
         )
-        response = 'Based on the metrics, I recommend: {"ttl_seconds": 60, "admission_threshold": 0.1, "eviction_priority": 0}'
 
         config = engine._parse_response(response)
 
@@ -101,9 +96,7 @@ class TestLLMPolicyEngineResponseParsing(unittest.TestCase):
 
     def test_parse_invalid_json_returns_none(self):
         """Should return None for unparseable responses."""
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
-        )
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
         response = "I cannot provide a recommendation"
 
         config = engine._parse_response(response)
@@ -112,9 +105,7 @@ class TestLLMPolicyEngineResponseParsing(unittest.TestCase):
 
     def test_parse_missing_fields_returns_none(self):
         """Should return None if required fields are missing."""
-        engine = LLMPolicyEngine(
-            llm_worker=MagicMock(), fallback=HeuristicPolicyEngine()
-        )
+        engine = LLMPolicyEngine(llm_worker=MagicMock(), fallback=HeuristicPolicyEngine())
         response = '{"ttl_seconds": 60}'  # Missing other fields
 
         config = engine._parse_response(response)
@@ -193,9 +184,7 @@ class TestLLMPolicyEngineFallback(unittest.TestCase):
             mock_worker.submit_task = slow_submit
 
             fallback = HeuristicPolicyEngine()
-            engine = LLMPolicyEngine(
-                llm_worker=mock_worker, fallback=fallback, timeout_seconds=0.1
-            )
+            engine = LLMPolicyEngine(llm_worker=mock_worker, fallback=fallback, timeout_seconds=0.1)
 
             metrics = SystemMetrics(miss_rate=0.6)
             config = await engine.compute_policy(metrics)
@@ -223,9 +212,7 @@ class TestLLMPolicyEngineDecisionCaching(unittest.TestCase):
                 nonlocal call_count
                 call_count += 1
                 if callback:
-                    await callback(
-                        '{"ttl_seconds": 120, "admission_threshold": 0.2, "eviction_priority": 1}'
-                    )
+                    await callback('{"ttl_seconds": 120, "admission_threshold": 0.2, "eviction_priority": 1}')
                 return True
 
             mock_worker = MagicMock()
@@ -259,9 +246,7 @@ class TestLLMPolicyEngineDecisionCaching(unittest.TestCase):
                 nonlocal call_count
                 call_count += 1
                 if callback:
-                    await callback(
-                        '{"ttl_seconds": 120, "admission_threshold": 0.2, "eviction_priority": 1}'
-                    )
+                    await callback('{"ttl_seconds": 120, "admission_threshold": 0.2, "eviction_priority": 1}')
                 return True
 
             mock_worker = MagicMock()
