@@ -42,24 +42,27 @@ class LLMPolicyEngine:
     - Falls back to HeuristicPolicyEngine on failure
     """
 
-    PROMPT_TEMPLATE = """You are a cache policy optimizer for a vector database.
-Given the following system metrics, recommend cache settings.
+    PROMPT_TEMPLATE = """You are an autonomous controller for a vector database cache.
+Your goal is to optimize for the following priorities:
+1. Stability: Keep P99 latency under 50ms.
+2. Efficiency: Maximize cache hit rate to reduce expensive vector search computations.
+3. Resource Management: Prevent CPU saturation (target < 80% utilization).
 
-Metrics:
-- QPS: {qps}
-- Miss Rate: {miss_rate}
+System Metrics:
+- Current QPS: {qps}
+- Current Cache Miss Rate: {miss_rate}
 - P99 Latency: {latency_p99_ms}ms
 - CPU Utilization: {cpu_utilization}%
 - GPU Utilization: {gpu_utilization}%
 
-Respond ONLY with a valid JSON object in this exact format:
-{{"ttl_seconds": <int>, "admission_threshold": <float 0-1>, "eviction_priority": <int 0-2>}}
+Task:
+Determine the optimal cache configuration to balance these goals based on the provided metrics.
+If resources are tight, sacrifice some cache efficiency to maintain stability.
+If latency is low and resources are available, try to increase TTL to improve future hit rates.
+If miss rate is high, consider whether increasing TTL or admission selectivity is better.
 
-Rules:
-- High miss rate (>0.5): Increase TTL (120-300s), lower admission threshold (0.05-0.1)
-- High latency (>100ms): Prioritize cache hits, increase TTL
-- High CPU (>80%): Reduce admission to limit cache overhead
-- Normal operation: TTL=60s, admission_threshold=0.1, eviction_priority=0
+Respond ONLY with a valid JSON object in this exact format:
+{{"ttl_seconds": <int between 30 and 3600>, "admission_threshold": <float 0-1>, "eviction_priority": <int 0-2>, "reasoning": "<short explanation>"}}
 """
 
     def __init__(
