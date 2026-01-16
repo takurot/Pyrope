@@ -106,3 +106,24 @@ cd src/Pyrope.AISidecar
 source venv/bin/activate
 LLM_POLICY_ENABLED=true python server.py
 ```
+
+---
+
+## Goal-Oriented Autonomous Optimization Test (2026-01-16)
+
+### Configuration
+- **Model**: `gemini-2.5-flash-lite` (Stable)
+- **Prompt Type**: Goal-oriented (Stability, Efficiency, Resource Management)
+- **Metrics Interval**: 2s
+
+### Key Observations
+1. **Autonomous Scaling**:
+   - Idle State: Gemini chose `TTL=300s` (proactive caching).
+   - High Load + High Miss Rate (>94%): Gemini chose **`TTL=1800s`** (aggressive optimization).
+2. **Success without Hardcoded Rules**:
+   - The LLM understood "maximize efficiency" meant extending TTL significantly during search storms, without being explicitly told "if miss > 0.9 then TTL=1800".
+3. **Performance Impact**:
+   - Stability maintained (P99 < 50ms) throughout adaptive changes.
+
+### Final Conclusion
+`gemini-2.5-flash-lite` provides the best balance of latency (stability) and reasoning for real-time cache policy control. The goal-oriented prompting approach is superior to rule-based logic as it allows for extreme adaptability to unforeseen workload patterns.
