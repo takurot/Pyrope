@@ -10,7 +10,7 @@ namespace Pyrope.GarnetServer.Security
         {
             if (string.IsNullOrWhiteSpace(pemPath)) throw new ArgumentException("PEM path cannot be empty.", nameof(pemPath));
             if (!File.Exists(pemPath)) throw new FileNotFoundException("PEM certificate file not found.", pemPath);
-            return X509CertificateLoader.LoadCertificateFromFile(pemPath);
+            return X509Certificate2.CreateFromPemFile(pemPath);
         }
 
         public static X509Certificate2 LoadClientCertificateFromPemFiles(string certPemPath, string keyPemPath)
