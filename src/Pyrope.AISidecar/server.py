@@ -1,3 +1,6 @@
+import sys
+print("DEBUG: Sidecar script started", flush=True)
+
 import grpc
 from concurrent import futures
 import time
@@ -27,10 +30,15 @@ import warnings
 # Suppress google.generativeai deprecation warning for clean demo output
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
+# Force logging configuration to ensure it applies even if other modules set it up
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True,
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
+logger = logging.getLogger(__name__)
+logger.info("Logging configured successfully")
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
