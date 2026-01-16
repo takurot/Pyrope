@@ -9,7 +9,6 @@ Refactored to meet "50ms strict timeout" by using an async update pattern.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -74,7 +73,7 @@ Respond ONLY with a valid JSON object in this exact format:
         self,
         llm_worker,
         fallback: HeuristicPolicyEngine,
-        timeout_seconds: float = 5.0, # Kept for API timeout logic, not blocking wait
+        timeout_seconds: float = 5.0,  # Kept for API timeout logic, not blocking wait
         cache_ttl_seconds: float = 60.0,
     ):
         self._llm = llm_worker
@@ -84,7 +83,7 @@ Respond ONLY with a valid JSON object in this exact format:
 
         # Decision cache: (metrics_key) -> (PolicyConfig, timestamp)
         self._cache: dict[str, tuple[PolicyConfig, float]] = {}
-        
+
         # Deduplication set for keys currently being processed by LLM
         self._inflight_keys: Set[str] = set()
 
@@ -97,25 +96,21 @@ Respond ONLY with a valid JSON object in this exact format:
             cpu_utilization=metrics.cpu_utilization,
             gpu_utilization=metrics.gpu_utilization,
         )
-    
+
     def _validate_and_clamp(self, config: PolicyConfig) -> PolicyConfig:
         """
         [Review] Validate and clamp policy values to safe ranges.
         """
         # Clamp TTL (30s - 3600s)
         ttl = max(30, min(3600, config.ttl_seconds))
-        
+
         # Clamp Admission (0.0 - 1.0)
         admission = max(0.0, min(1.0, config.admission_threshold))
-        
+
         # Clamp Eviction Priority (0 - 2)
         eviction = max(0, min(2, config.eviction_priority))
-        
-        return PolicyConfig(
-            ttl_seconds=int(ttl),
-            admission_threshold=float(admission),
-            eviction_priority=int(eviction)
-        )
+
+        return PolicyConfig(ttl_seconds=int(ttl), admission_threshold=float(admission), eviction_priority=int(eviction))
 
     def _parse_response(self, response: str) -> Optional[PolicyConfig]:
         """Parse LLM response into PolicyConfig."""
@@ -142,7 +137,7 @@ Respond ONLY with a valid JSON object in this exact format:
                 ttl_seconds=int(data["ttl_seconds"]),
                 eviction_priority=int(data["eviction_priority"]),
             )
-            
+
             # [Review] Validate semantics
             return self._validate_and_clamp(config)
 
@@ -180,12 +175,12 @@ Respond ONLY with a valid JSON object in this exact format:
     async def compute_policy(self, metrics: SystemMetrics) -> PolicyConfig:
         """
         Compute cache policy using LLM.
-        
+
         [Review] Non-blocking implementation:
         1. Checks cache -> returns if Hit
         2. Checks inflight -> returns Heuristic if already processing
         3. If Cache Miss & No Inflight -> Launches Async Job & Returns Heuristic immediately.
-        
+
         This satisfies the strict latency requirements of the metrics reporting loop.
         """
         # 1. Check cache first
@@ -202,10 +197,10 @@ Respond ONLY with a valid JSON object in this exact format:
 
         # 3. Launch async update (Fire and Forget)
         self._inflight_keys.add(key)
-        
+
         # Capture context for callback
         current_metrics = metrics
-        
+
         async def on_complete(response_text):
             try:
                 self._inflight_keys.discard(key)
@@ -217,19 +212,19 @@ Respond ONLY with a valid JSON object in this exact format:
                     else:
                         logger.warning(f"Failed to parse LLM response for {key}")
                 else:
-                     logger.warning(f"LLM returned None for {key}")
+                    logger.warning(f"LLM returned None for {key}")
             except Exception as e:
                 logger.error(f"Error in LLM callback: {e}")
                 self._inflight_keys.discard(key)
 
         prompt = self._build_prompt(metrics)
         success = await self._llm.submit_task(prompt, callback=on_complete)
-        
+
         if success:
-             logger.info(f"Triggered async LLM update for key {key}")
+            logger.info(f"Triggered async LLM update for key {key}")
         else:
-             self._inflight_keys.discard(key)
-             logger.warning(f"Failed to submit LLM task for {key}")
+            self._inflight_keys.discard(key)
+            logger.warning(f"Failed to submit LLM task for {key}")
 
         # Return heuristic immediately so we don't block the Sidecar server
         return self._fallback.compute_policy(metrics.miss_rate)

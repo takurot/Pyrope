@@ -43,7 +43,7 @@ class LLMWorker:
         # [Review] Allow env override or default
         # [Review] Prioritize constructor arg, then env var, then default
         self.model_name = model_name or os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash-lite")
-        
+
         self.queue: Optional[asyncio.Queue] = None
         self.running = False
         self._worker_task: Optional[asyncio.Task] = None
@@ -150,12 +150,11 @@ class LLMWorker:
         if not self.queue:
             logger.error("LLMWorker: Not started. Call start() first.")
             return False
-            
         if self._is_disabled:
-             logger.warning("LLMWorker is disabled (missing API key or init failure). Rejecting task.")
-             if callback:
-                 await callback(None)
-             return False
+            logger.warning("LLMWorker is disabled (missing API key or init failure). Rejecting task.")
+            if callback:
+                await callback(None)
+            return False
 
         if self.is_over_budget():
             self.stats["requests_budget_exceeded"] += 1
@@ -189,7 +188,8 @@ class LLMWorker:
                 if self._is_disabled or not self.model:
                     self.stats["requests_failed"] += 1
                     self.queue.task_done()
-                    if callback: await callback(None) # Callback right away
+                    if callback:
+                        await callback(None)  # Callback right away
                     continue
 
                 if self.is_rate_limited():
@@ -207,8 +207,9 @@ class LLMWorker:
                     try:
                         self.queue.put_nowait((prompt, callback, retry_count + 1))
                     except asyncio.QueueFull:
-                        if callback: await callback(None)
-                    
+                        if callback:
+                            await callback(None)
+
                     self.queue.task_done()
                     continue
 
@@ -227,7 +228,7 @@ class LLMWorker:
                     text = response.text
                     latency = time.time() - start_time
 
-                    input_tokens = len(prompt.split()) * 1.3 
+                    input_tokens = len(prompt.split()) * 1.3
                     output_tokens = len(text.split()) * 1.3 if text else 0
                     total_tokens = int(input_tokens + output_tokens)
 

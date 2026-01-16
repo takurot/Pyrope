@@ -1,12 +1,13 @@
+import asyncio
+import logging
+import os
 import sys
-print("DEBUG: Sidecar script started", flush=True)
+import threading
+import time
+import warnings
+from concurrent import futures
 
 import grpc
-from concurrent import futures
-import time
-import os
-import threading
-import asyncio
 
 # These imports will work after running codegen.py
 try:
@@ -17,32 +18,27 @@ except ImportError as e:
     sys.exit(1)
 
 from feature_engineering import FeatureEngineer
-from policy_engine import HeuristicPolicyEngine
-from logger import QueryLogger
-from prediction_engine import PredictionEngine
 from llm_policy_engine import LLMPolicyEngine, SystemMetrics
-
 from llm_worker import LLMWorker
-
-# Feature flag for Gemini-based cache control
-LLM_POLICY_ENABLED = os.getenv("LLM_POLICY_ENABLED", "false").lower() == "true"
-
-# Configure logging
-import logging
-import warnings
+from logger import QueryLogger
+from policy_engine import HeuristicPolicyEngine
+from prediction_engine import PredictionEngine
 
 # Suppress google.generativeai deprecation warning for clean demo output
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
-# Force logging configuration to ensure it applies even if other modules set it up
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     force=True,
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 logger.info("Logging configured successfully")
+
+# Feature flag for Gemini-based cache control
+LLM_POLICY_ENABLED = os.getenv("LLM_POLICY_ENABLED", "false").lower() == "true"
 
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
@@ -205,7 +201,7 @@ def _configure_ports(server: grpc.Server, port: int) -> None:
 def serve():
     port = int(os.getenv("PYROPE_SIDECAR_PORT", "50051"))
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    
+
     print("DEBUG: Initializing PolicyService...", flush=True)
     try:
         policy_service = PolicyService()
@@ -213,9 +209,10 @@ def serve():
     except Exception as e:
         print(f"CRITICAL ERROR initializing PolicyService: {e}", flush=True)
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
-        
+
     policy_service_pb2_grpc.add_PolicyServiceServicer_to_server(policy_service, server)
 
     _configure_ports(server, port)
