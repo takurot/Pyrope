@@ -41,6 +41,7 @@ class LLMWorker:
     ):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         # [Review] Allow env override or default
+        # [Review] Prioritize constructor arg, then env var, then default
         self.model_name = model_name or os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash-lite")
         
         self.queue: Optional[asyncio.Queue] = None
