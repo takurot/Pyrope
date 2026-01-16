@@ -119,7 +119,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P6-10** | [Core] | **LLM Prefetch Dispatcher**<br>Convert LLM predictions into prefetch jobs. Reuse P6-5 background search fill. | P6-5, P6-8 | [x] |
 | **P6-11** | [Core] | **LLM Eviction/TTL Overrides**<br>Apply LLM advisory TTL/priority in eviction scoring with guardrails. | P2-4, P6-8 | [x] |
 | **P6-12** | [Ops] | **LLM Budgeting & Metrics**<br>Rate-limit Gemini calls, track cost, expose metrics/alerts. | P3-4, P6-8 | [x] |
-| **P6-13** | [ML] | **Gemini Cache Control Integration**<br>Replace HeuristicPolicyEngine with LLMPolicyEngine. Use Gemini to generate TTL, admission threshold, and eviction priority based on system metrics. Implement fallback to heuristic on LLM failure. Feature flag: `LLM_POLICY_ENABLED`. | P6-8, P6-12 | [/] |
+| **P6-13** | [ML] | **Gemini Cache Control Integration**<br>Replace HeuristicPolicyEngine with LLMPolicyEngine. Use Gemini to generate TTL, admission threshold, and eviction priority based on system metrics. Implement fallback to heuristic on LLM failure. Feature flag: `LLM_POLICY_ENABLED`. | P6-8, P6-12 | [x] |
 
 ---
 
