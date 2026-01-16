@@ -1,6 +1,7 @@
 import sys
 print("DEBUG: Sidecar script started", flush=True)
 
+print("DEBUG: importing grpc/futures...", flush=True)
 import grpc
 from concurrent import futures
 import time
@@ -8,16 +9,27 @@ import os
 import threading
 import asyncio
 
+print("DEBUG: importing generated protobufs...", flush=True)
 # These imports will work after running codegen.py
-import policy_service_pb2
-import policy_service_pb2_grpc
+try:
+    import policy_service_pb2
+    import policy_service_pb2_grpc
+except ImportError as e:
+    print(f"DEBUG: Failed to import protobufs: {e}", flush=True)
+    sys.exit(1)
 
+print("DEBUG: importing FeatureEngineer...", flush=True)
 from feature_engineering import FeatureEngineer
+print("DEBUG: importing HeuristicPolicyEngine...", flush=True)
 from policy_engine import HeuristicPolicyEngine
+print("DEBUG: importing QueryLogger...", flush=True)
 from logger import QueryLogger
+print("DEBUG: importing PredictionEngine...", flush=True)
 from prediction_engine import PredictionEngine
+print("DEBUG: importing LLMPolicyEngine...", flush=True)
 from llm_policy_engine import LLMPolicyEngine, SystemMetrics
 
+print("DEBUG: importing LLMWorker...", flush=True)
 from llm_worker import LLMWorker
 
 # Feature flag for Gemini-based cache control
