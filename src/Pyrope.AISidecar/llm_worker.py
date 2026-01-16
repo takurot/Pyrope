@@ -17,9 +17,10 @@ class LLMWorker:
     P6-8 + P6-12: LLM Worker with Gemini integration and budgeting.
 
     Fixes from Codex review:
-    - Queue created in start() to bind to correct event loop
-    - Proper shutdown with sentinel and task cancellation
-    - Max retry count for rate-limited requests
+    - Queue limit to prevent memory bloat
+    - Proper API key validation
+    - Configurable model name via env var
+    - Robust error handling
     """
 
     # Default budget limits
@@ -27,19 +28,21 @@ class LLMWorker:
     DEFAULT_MAX_TOKENS_PER_MINUTE = 100000
     DEFAULT_MONTHLY_TOKEN_BUDGET = 10_000_000
     DEFAULT_MAX_RETRIES = 3
+    DEFAULT_QUEUE_SIZE = 10  # [Review] Queue limit
 
     def __init__(
         self,
         api_key=None,
-        model_name="gemini-2.5-flash-lite",
+        model_name=None,
         max_requests_per_minute=None,
         max_tokens_per_minute=None,
         monthly_token_budget=None,
         max_retries=None,
     ):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model_name
-        # FIX: Queue created in start() to bind to correct event loop
+        # [Review] Allow env override or default
+        self.model_name = model_name or os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash-lite")
+        
         self.queue: Optional[asyncio.Queue] = None
         self.running = False
         self._worker_task: Optional[asyncio.Task] = None
@@ -49,7 +52,6 @@ class LLMWorker:
         self.max_requests_per_minute = max_requests_per_minute or self.DEFAULT_MAX_REQUESTS_PER_MINUTE
         self.max_tokens_per_minute = max_tokens_per_minute or self.DEFAULT_MAX_TOKENS_PER_MINUTE
         self.monthly_token_budget = monthly_token_budget or self.DEFAULT_MONTHLY_TOKEN_BUDGET
-        # FIX: Max retries for rate-limited requests
         self.max_retries = max_retries or self.DEFAULT_MAX_RETRIES
 
         # P6-12: Rate limiting state
@@ -73,20 +75,26 @@ class LLMWorker:
             "avg_latency": 0,
         }
         self._latencies = deque(maxlen=100)
+        self._is_disabled = False
 
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-            logger.info(f"LLMWorker initialized with model {self.model_name}")
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                logger.info(f"LLMWorker initialized with model {self.model_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini model: {e}")
+                self._is_disabled = True
         else:
             self.model = None
-            logger.warning("GEMINI_API_KEY not found. LLMWorker will fail requests.")
+            self._is_disabled = True
+            logger.warning("GEMINI_API_KEY not found. LLMWorker is disabled.")
 
     async def start(self):
         """Starts the background worker loop."""
-        # FIX: Create queue in the running event loop
         self._loop = asyncio.get_running_loop()
-        self.queue = asyncio.Queue()
+        # [Review] Add maxsize to prevent unbounded growth
+        self.queue = asyncio.Queue(maxsize=self.DEFAULT_QUEUE_SIZE)
         self.running = True
         self._worker_task = asyncio.create_task(self._process_queue())
         logger.info("LLMWorker started.")
@@ -95,11 +103,13 @@ class LLMWorker:
         """Stops the background worker loop cleanly."""
         self.running = False
 
-        # FIX: Push sentinel to unblock queue.get()
         if self.queue:
-            await self.queue.put((_SHUTDOWN_SENTINEL, None, 0))
+            try:
+                # Use nowait to avoid blocking on full queue during shutdown
+                self.queue.put_nowait((_SHUTDOWN_SENTINEL, None, 0))
+            except asyncio.QueueFull:
+                pass
 
-        # FIX: Cancel and wait for worker task
         if self._worker_task:
             self._worker_task.cancel()
             try:
@@ -114,17 +124,14 @@ class LLMWorker:
         now = time.time()
         window_start = now - 60
 
-        # Clean old entries
         while self._request_timestamps and self._request_timestamps[0] < window_start:
             self._request_timestamps.popleft()
         while self._token_window and self._token_window[0][0] < window_start:
             self._token_window.popleft()
 
-        # Check request rate
         if len(self._request_timestamps) >= self.max_requests_per_minute:
             return True
 
-        # Check token rate
         tokens_in_window = sum(t[1] for t in self._token_window)
         if tokens_in_window >= self.max_tokens_per_minute:
             return True
@@ -132,22 +139,22 @@ class LLMWorker:
         return False
 
     def is_over_budget(self) -> bool:
-        """P6-12: Check if monthly budget is exceeded."""
         return self.stats["monthly_tokens_used"] >= self.monthly_token_budget
 
     def get_stats(self) -> dict:
-        """P6-12: Get stats for Prometheus metrics."""
         return dict(self.stats)
 
     async def submit_task(self, prompt, callback=None, priority=0) -> bool:
-        """Submits a prompt to the queue.
-        callback: async function(response_text)
-        priority: 0=normal, 1=high (not implemented yet)
-        Returns: True if queued, False if rejected
-        """
+        """Submits a prompt to the queue."""
         if not self.queue:
             logger.error("LLMWorker: Not started. Call start() first.")
             return False
+            
+        if self._is_disabled:
+             logger.warning("LLMWorker is disabled (missing API key or init failure). Rejecting task.")
+             if callback:
+                 await callback(None)
+             return False
 
         if self.is_over_budget():
             self.stats["requests_budget_exceeded"] += 1
@@ -156,37 +163,36 @@ class LLMWorker:
                 await callback(None)
             return False
 
-        # FIX: Include retry count in queue item
-        await self.queue.put((prompt, callback, 0))  # 0 = initial retry count
-        return True
+        try:
+            # [Review] Don't block if queue is full, just reject (Fail fast strategy)
+            self.queue.put_nowait((prompt, callback, 0))
+            return True
+        except asyncio.QueueFull:
+            logger.warning("LLMWorker: Queue full. Rejecting task.")
+            return False
 
     async def _process_queue(self):
         while self.running:
             try:
-                # Wait for a task with timeout to allow checking running flag
                 try:
                     item = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
                     continue
 
-                # FIX: Check for shutdown sentinel
                 if item[0] is _SHUTDOWN_SENTINEL:
                     self.queue.task_done()
                     break
 
                 prompt, callback, retry_count = item
 
-                if not self.model:
-                    logger.error("LLMWorker: Model not initialized (missing API key). Skipping task.")
+                if self._is_disabled or not self.model:
                     self.stats["requests_failed"] += 1
                     self.queue.task_done()
+                    if callback: await callback(None) # Callback right away
                     continue
 
-                # P6-12: Rate limiting check with retry cap
                 if self.is_rate_limited():
                     self.stats["requests_rate_limited"] += 1
-
-                    # FIX: Check max retries
                     if retry_count >= self.max_retries:
                         logger.warning(f"LLMWorker: Max retries ({self.max_retries}) exceeded. Dropping task.")
                         self.stats["requests_dropped_max_retry"] += 1
@@ -197,15 +203,16 @@ class LLMWorker:
 
                     logger.warning(f"LLMWorker: Rate limited. Retry {retry_count + 1}/{self.max_retries}")
                     await asyncio.sleep(1)
-                    # Re-queue with incremented retry count
-                    await self.queue.put((prompt, callback, retry_count + 1))
+                    try:
+                        self.queue.put_nowait((prompt, callback, retry_count + 1))
+                    except asyncio.QueueFull:
+                        if callback: await callback(None)
+                    
                     self.queue.task_done()
                     continue
 
-                # P6-12: Budget check
                 if self.is_over_budget():
                     self.stats["requests_budget_exceeded"] += 1
-                    logger.warning("LLMWorker: Budget exceeded. Skipping task.")
                     if callback:
                         await callback(None)
                     self.queue.task_done()
@@ -219,17 +226,14 @@ class LLMWorker:
                     text = response.text
                     latency = time.time() - start_time
 
-                    # P6-12: Token metering (estimate if not available)
-                    input_tokens = len(prompt.split()) * 1.3  # rough estimate
+                    input_tokens = len(prompt.split()) * 1.3 
                     output_tokens = len(text.split()) * 1.3 if text else 0
                     total_tokens = int(input_tokens + output_tokens)
 
-                    # Update rate limiting state
                     now = time.time()
                     self._request_timestamps.append(now)
                     self._token_window.append((now, total_tokens))
 
-                    # Update stats
                     self.stats["requests_total"] += 1
                     self.stats["requests_succeeded"] += 1
                     self.stats["tokens_total"] += total_tokens
