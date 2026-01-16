@@ -20,6 +20,13 @@ from llm_worker import LLMWorker
 # Feature flag for Gemini-based cache control
 LLM_POLICY_ENABLED = os.getenv("LLM_POLICY_ENABLED", "false").lower() == "true"
 
+# Configure logging
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 
 class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def __init__(self, log_path="logs/query_log.jsonl"):
