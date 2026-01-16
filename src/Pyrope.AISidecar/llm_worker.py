@@ -31,7 +31,7 @@ class LLMWorker:
     def __init__(
         self,
         api_key=None,
-        model_name="gemini-pro",
+        model_name="gemini-1.5-flash",
         max_requests_per_minute=None,
         max_tokens_per_minute=None,
         monthly_token_budget=None,
