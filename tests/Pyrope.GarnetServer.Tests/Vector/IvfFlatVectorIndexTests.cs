@@ -120,7 +120,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
                 // With 'required' properties, this SHOULD throw JsonException
                 // We want to verify this behavior or (if we fix it) verify it doesn't throw.
                 // Current requirement: Remove 'required' to allow backward compatibility.
-                
+
                 // So, after fix, this should NOT throw.
                 index.Load(path);
 
