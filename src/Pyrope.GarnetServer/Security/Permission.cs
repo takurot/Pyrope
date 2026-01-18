@@ -29,7 +29,10 @@ namespace Pyrope.GarnetServer.Security
         PolicyRead,
 
         // Audit operations
-        AuditRead
+        AuditRead,
+
+        // Billing operations
+        BillingRead
     }
 
     /// <summary>
@@ -45,7 +48,8 @@ namespace Pyrope.GarnetServer.Security
             {
                 Permission.IndexRead,
                 Permission.TenantRead,
-                Permission.PolicyRead
+                Permission.PolicyRead,
+                Permission.BillingRead
             };
 
             var operatorPerms = new HashSet<Permission>(readerPerms)

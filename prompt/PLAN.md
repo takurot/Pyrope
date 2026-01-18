@@ -128,11 +128,11 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 | ID | Track | Task | Dependencies | Status |
 |----|-------|------|--------------|--------|
-| **P7-1** | [Core] | **Request Metering**<br>Count search requests per tenant. Include cache hit/miss breakdown. | P5-1, P2-5 | [ ] |
-| **P7-2** | [Core] | **Compute Metering**<br>Estimate CPU/GPU seconds per request using Proxy Cost Metric. Aggregate per tenant. | P6-3, P5-1 | [ ] |
-| **P7-3** | [Core] | **Storage Metering**<br>Track vector storage bytes, snapshot storage per tenant. | P5-1 | [ ] |
-| **P7-4** | [API] | **Billing API**<br>`GET /v1/billing/usage`. Return requests, compute, storage, cache memory by tenant. | P7-1, P7-2, P7-3 | [ ] |
-| **P7-5** | [Core] | **Tamper-Resistant Billing Logs**<br>Aggregated logs for auditing. Optional: signed/separate store for Enterprise. | P7-4 | [ ] |
+| **P7-1** | [Core] | **Request Metering**<br>Count search requests per tenant. Include cache hit/miss breakdown. | P5-1, P2-5 | [x] |
+| **P7-2** | [Core] | **Compute Metering**<br>Estimate CPU/GPU seconds per request using Proxy Cost Metric. Aggregate per tenant. | P6-3, P5-1 | [x] |
+| **P7-3** | [Core] | **Storage Metering**<br>Track vector storage bytes, snapshot storage per tenant. | P5-1 | [x] |
+| **P7-4** | [API] | **Billing API**<br>`GET /v1/billing/usage`. Return requests, compute, storage, cache memory by tenant. | P7-1, P7-2, P7-3 | [x] |
+| **P7-5** | [Core] | **Tamper-Resistant Billing Logs**<br>Aggregated logs for auditing. Optional: signed/separate store for Enterprise. | P7-4 | [x] |
 
 ---
 
@@ -184,6 +184,10 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P10-12** | [Core] | **Vector Memory Layout Optimization**<br>Transition from AoS (Array of Structures) to SoA (Structure of Arrays) or blocked layout to improve CPU cache locality and SIMD load efficiency. | P10-9 | [x] |
 | **P10-13** | [Core] | **Advanced SIMD Tuning**<br>Implement loop unrolling with multiple accumulators and unsafe pointers to eliminate bounds checks. Support `Vector512<T>` (AVX-512) for capable hardware. **Completed (1.77x speedup)** | P10-9 | [x] |
 | **P10-14** | [Core] | **Scalar Quantization (SQ)**<br>Implement Int8/Byte scalar quantization for vectors. Reduces memory bandwidth by 4x. **Completed (1.54x speedup)** | P1-4 | [x] |
+| **P10-15** | [Core] | **IVF nlist Tuning**<br>Tune `nlist` parameter (256 → 1024) for large datasets (500k+). Expected P99 30% reduction with minimal recall loss. | P10-8 | [ ] |
+| **P10-16** | [Core] | **HNSW Index Implementation**<br>Implement Hierarchical Navigable Small World graph for O(log n) search complexity. Expected 2-3x QPS improvement and 50% P99 reduction vs IVF-Flat. | P10-8 | [ ] |
+| **P10-17** | [Core] | **IVF-PQ (Product Quantization)**<br>Implement Product Quantization for IVF index. Reduces memory by 4-8x, enabling 1M+ vector support on limited memory. | P10-8 | [ ] |
+| **P10-18** | [Core] | **Parallel nprobe Search**<br>Parallelize IVF cluster probing across multiple threads. Expected 1.5x QPS improvement for high-latency queries. | P10-8 | [ ] |
 
 ---
 
@@ -258,6 +262,10 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented **P5-3 Noisy Neighbor Mitigation**:
   - Added tenant `Priority` (0=high, 1=normal, 2=low).
   - Under degradation: protect high-priority tenants; shed low-priority tenants on cache miss.
+- Implemented Phase 7 billing/metering:
+  - Per-tenant request/compute/storage metering with cache hit/miss breakdown.
+  - `/v1/billing/usage` API returning requests/compute/storage/cache memory.
+  - Tamper-resistant billing logs with hash chaining and tests.
 - Added **Sidecar gRPC mTLS** (Garnet↔AISidecar): cert-based secure channel + local cert generation script + docker-compose wiring.
 - Implemented **P1-6 Vector Benchmarking Data & Tool**: added `src/Pyrope.Benchmarks` (SIFT fvecs / GloVe txt loaders, QPS/latency reporting) and `scripts/bench_vectors.sh`.
 - Implemented **P5-6 Authorization (RBAC)**:
