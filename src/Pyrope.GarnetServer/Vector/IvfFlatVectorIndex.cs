@@ -441,26 +441,26 @@ namespace Pyrope.GarnetServer.Vector
         // DTOs
         private class IvfStateDto
         {
-            public required int Dimension { get; set; }
-            public required VectorMetric Metric { get; set; }
-            public required bool IsBuilt { get; set; }
-            public required List<float[]> Centroids { get; set; }
-            public required List<float> CentroidNorms { get; set; }
-            public required Dictionary<string, VectorEntryDto> Buffer { get; set; }
-            public required Dictionary<string, List<KeyedVectorDto>> InvertedLists { get; set; }
+            public int Dimension { get; set; }
+            public VectorMetric Metric { get; set; }
+            public bool IsBuilt { get; set; }
+            public List<float[]> Centroids { get; set; } = new();
+            public List<float> CentroidNorms { get; set; } = new();
+            public Dictionary<string, VectorEntryDto> Buffer { get; set; } = new();
+            public Dictionary<string, List<KeyedVectorDto>> InvertedLists { get; set; } = new();
         }
 
         private class VectorEntryDto
         {
-            public required float[] Vector { get; set; }
-            public required float Norm { get; set; }
+            public float[] Vector { get; set; } = null!;
+            public float Norm { get; set; }
         }
 
         private class KeyedVectorDto
         {
-            public required string Id { get; set; }
-            public required float[] Vector { get; set; }
-            public required float Norm { get; set; }
+            public string Id { get; set; } = null!;
+            public float[] Vector { get; set; } = null!;
+            public float Norm { get; set; }
         }
     }
 }

@@ -99,5 +99,39 @@ namespace Pyrope.GarnetServer.Tests.Vector
                 if (File.Exists(path)) File.Delete(path);
             }
         }
+
+        [Fact]
+        public void Load_MissingFields_ShouldHandleGracefully()
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                // Create a partial JSON that is missing some 'required' fields
+                // Simulates an old snapshot format
+                var json = @"{
+                    ""Dimension"": 2,
+                    ""Metric"": 1,
+                    ""IsBuilt"": false,
+                    ""Buffer"": {} 
+                }";
+                File.WriteAllText(path, json);
+
+                var index = new IvfFlatVectorIndex(2, VectorMetric.L2);
+                // With 'required' properties, this SHOULD throw JsonException
+                // We want to verify this behavior or (if we fix it) verify it doesn't throw.
+                // Current requirement: Remove 'required' to allow backward compatibility.
+                
+                // So, after fix, this should NOT throw.
+                index.Load(path);
+
+                // Verify internal state is safe (defaults initialized)
+                var results = index.Search(new float[] { 0f, 0f }, 1);
+                Assert.Empty(results);
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
     }
 }
