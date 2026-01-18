@@ -444,22 +444,22 @@ namespace Pyrope.GarnetServer.Vector
             public int Dimension { get; set; }
             public VectorMetric Metric { get; set; }
             public bool IsBuilt { get; set; }
-            public List<float[]> Centroids { get; set; }
-            public List<float> CentroidNorms { get; set; }
-            public Dictionary<string, VectorEntryDto> Buffer { get; set; }
-            public Dictionary<string, List<KeyedVectorDto>> InvertedLists { get; set; }
+            public List<float[]> Centroids { get; set; } = new();
+            public List<float> CentroidNorms { get; set; } = new();
+            public Dictionary<string, VectorEntryDto> Buffer { get; set; } = new();
+            public Dictionary<string, List<KeyedVectorDto>> InvertedLists { get; set; } = new();
         }
 
         private class VectorEntryDto
         {
-            public float[] Vector { get; set; }
+            public float[] Vector { get; set; } = null!;
             public float Norm { get; set; }
         }
 
         private class KeyedVectorDto
         {
-            public string Id { get; set; }
-            public float[] Vector { get; set; }
+            public string Id { get; set; } = null!;
+            public float[] Vector { get; set; } = null!;
             public float Norm { get; set; }
         }
     }
