@@ -124,6 +124,134 @@ namespace Pyrope.GarnetServer.Vector
             return Cosine(a, b, normA, normB);
         }
 
+
+        public static unsafe float DotProductUnsafe(float[] a, float[] b)
+        {
+            ValidateInput(a, b);
+
+            int vectorSize = Vector<float>.Count;
+            int length = a.Length;
+            int i = 0;
+            float sum = 0f;
+
+            if (length >= vectorSize * 4)
+            {
+                var acc1 = Vector<float>.Zero;
+                var acc2 = Vector<float>.Zero;
+                var acc3 = Vector<float>.Zero;
+                var acc4 = Vector<float>.Zero;
+
+                int end = length - (vectorSize * 4);
+
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= end)
+                    {
+                        acc1 += *(Vector<float>*)(pA + i) * *(Vector<float>*)(pB + i);
+                        acc2 += *(Vector<float>*)(pA + i + vectorSize) * *(Vector<float>*)(pB + i + vectorSize);
+                        acc3 += *(Vector<float>*)(pA + i + vectorSize * 2) * *(Vector<float>*)(pB + i + vectorSize * 2);
+                        acc4 += *(Vector<float>*)(pA + i + vectorSize * 3) * *(Vector<float>*)(pB + i + vectorSize * 3);
+                        i += vectorSize * 4;
+                    }
+                }
+
+                var finalAcc = acc1 + acc2 + acc3 + acc4;
+                sum += System.Numerics.Vector.Dot(finalAcc, Vector<float>.One);
+            }
+
+            // Handle remaining vectors (1 to 3 blocks)
+            if (i <= length - vectorSize)
+            {
+                var acc = Vector<float>.Zero;
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= length - vectorSize)
+                    {
+                        acc += *(Vector<float>*)(pA + i) * *(Vector<float>*)(pB + i);
+                        i += vectorSize;
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(acc, Vector<float>.One);
+            }
+
+            // Scalar tail
+            for (; i < length; i++)
+            {
+                sum += a[i] * b[i];
+            }
+
+            return sum;
+        }
+
+        public static unsafe float L2SquaredUnsafe(float[] a, float[] b)
+        {
+            ValidateInput(a, b);
+
+            int vectorSize = Vector<float>.Count;
+            int length = a.Length;
+            int i = 0;
+            float sum = 0f;
+
+            if (length >= vectorSize * 4)
+            {
+                var acc1 = Vector<float>.Zero;
+                var acc2 = Vector<float>.Zero;
+                var acc3 = Vector<float>.Zero;
+                var acc4 = Vector<float>.Zero;
+
+                int end = length - (vectorSize * 4);
+
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= end)
+                    {
+                        var d1 = *(Vector<float>*)(pA + i) - *(Vector<float>*)(pB + i);
+                        var d2 = *(Vector<float>*)(pA + i + vectorSize) - *(Vector<float>*)(pB + i + vectorSize);
+                        var d3 = *(Vector<float>*)(pA + i + vectorSize * 2) - *(Vector<float>*)(pB + i + vectorSize * 2);
+                        var d4 = *(Vector<float>*)(pA + i + vectorSize * 3) - *(Vector<float>*)(pB + i + vectorSize * 3);
+
+                        acc1 += d1 * d1;
+                        acc2 += d2 * d2;
+                        acc3 += d3 * d3;
+                        acc4 += d4 * d4;
+                        i += vectorSize * 4;
+                    }
+                }
+
+                var finalAcc = acc1 + acc2 + acc3 + acc4;
+                sum += System.Numerics.Vector.Dot(finalAcc, Vector<float>.One);
+            }
+
+            // Handle remaining vectors (1 to 3 blocks)
+            if (i <= length - vectorSize)
+            {
+                var acc = Vector<float>.Zero;
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= length - vectorSize)
+                    {
+                        var diff = *(Vector<float>*)(pA + i) - *(Vector<float>*)(pB + i);
+                        acc += diff * diff;
+                        i += vectorSize;
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(acc, Vector<float>.One);
+            }
+
+            // Scalar tail
+            for (; i < length; i++)
+            {
+                var diff = a[i] - b[i];
+                sum += diff * diff;
+            }
+
+            return sum;
+        }
+
         private static void ValidateInput(float[] a, float[] b)
         {
             if (a == null) throw new ArgumentNullException(nameof(a));

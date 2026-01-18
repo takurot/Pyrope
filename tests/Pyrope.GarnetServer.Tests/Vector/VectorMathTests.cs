@@ -105,5 +105,28 @@ namespace Pyrope.GarnetServer.Tests.Vector
             var b = new float[11];
             Assert.Throws<ArgumentException>(() => VectorMath.Cosine(a, b));
         }
+        [Fact]
+        public void DotProductUnsafe_MatchesReference()
+        {
+            var dim = 1024 + 13; // Unaligned
+            var a = Enumerable.Range(0, dim).Select(i => (float)i * 0.001f).ToArray();
+            var b = Enumerable.Range(0, dim).Select(i => (float)i * 0.0005f).ToArray();
+
+            var expected = VectorMath.DotProduct(a, b);
+            var actual = VectorMath.DotProductUnsafe(a, b);
+            Assert.Equal(expected, actual, 1e-4f);
+        }
+
+        [Fact]
+        public void L2SquaredUnsafe_MatchesReference()
+        {
+            var dim = 1024 + 13; // Unaligned
+            var a = Enumerable.Range(0, dim).Select(i => (float)i * 0.001f).ToArray();
+            var b = Enumerable.Range(0, dim).Select(i => (float)i * 0.0005f).ToArray();
+
+            var expected = VectorMath.L2Squared(a, b);
+            var actual = VectorMath.L2SquaredUnsafe(a, b);
+            Assert.Equal(expected, actual, 1e-4f);
+        }
     }
 }

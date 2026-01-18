@@ -271,9 +271,10 @@ namespace Pyrope.GarnetServer.Vector
         {
             return Metric switch
             {
-                VectorMetric.L2 => -VectorMath.L2Squared(query, entry.Vector),
-                VectorMetric.InnerProduct => VectorMath.DotProduct(query, entry.Vector),
-                VectorMetric.Cosine => VectorMath.Cosine(query, entry.Vector, queryNorm, entry.Norm),
+                VectorMetric.L2 => -VectorMath.L2SquaredUnsafe(query, entry.Vector),
+                VectorMetric.InnerProduct => VectorMath.DotProductUnsafe(query, entry.Vector),
+                // Optimized Cosine: Safe DotProductUnsafe
+                VectorMetric.Cosine => (queryNorm < 1e-6f || entry.Norm < 1e-6f) ? 0f : VectorMath.DotProductUnsafe(query, entry.Vector) / (queryNorm * entry.Norm),
                 _ => throw new InvalidOperationException("Unsupported metric.")
             };
         }
