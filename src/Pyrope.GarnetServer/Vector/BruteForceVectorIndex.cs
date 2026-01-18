@@ -200,6 +200,9 @@ namespace Pyrope.GarnetServer.Vector
                 // Keep topK results in a min-heap: O(N log K)
                 var heap = new PriorityQueue<SearchResult, float>();
                 var scanned = 0;
+
+                float queryNorm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(query) : 0f;
+
                 foreach (var entry in _entries)
                 {
                     if (scanned >= scanLimit)
@@ -208,7 +211,7 @@ namespace Pyrope.GarnetServer.Vector
                     }
                     scanned++;
 
-                    var score = ComputeScore(query, entry.Value);
+                    var score = ComputeScore(query, entry.Value, queryNorm);
                     heap.Enqueue(new SearchResult(entry.Key, score), score);
                     if (heap.Count > topK)
                     {
@@ -260,62 +263,22 @@ namespace Pyrope.GarnetServer.Vector
             var copy = new float[vector.Length];
             Array.Copy(vector, copy, vector.Length);
 
-            var norm = Metric == VectorMetric.Cosine ? ComputeNorm(copy) : 0f;
+            var norm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(copy) : 0f;
             return new VectorEntry(copy, norm);
         }
 
-        private float ComputeScore(float[] query, VectorEntry entry)
+        private float ComputeScore(float[] query, VectorEntry entry, float queryNorm)
         {
             return Metric switch
             {
-                VectorMetric.L2 => -SquaredL2(query, entry.Vector),
-                VectorMetric.InnerProduct => Dot(query, entry.Vector),
-                VectorMetric.Cosine => Cosine(query, entry.Vector, entry.Norm),
+                VectorMetric.L2 => -VectorMath.L2Squared(query, entry.Vector),
+                VectorMetric.InnerProduct => VectorMath.DotProduct(query, entry.Vector),
+                VectorMetric.Cosine => VectorMath.Cosine(query, entry.Vector, queryNorm, entry.Norm),
                 _ => throw new InvalidOperationException("Unsupported metric.")
             };
         }
 
-        private static float Dot(float[] a, float[] b)
-        {
-            var sum = 0f;
-            for (var i = 0; i < a.Length; i++)
-            {
-                sum += a[i] * b[i];
-            }
-            return sum;
-        }
 
-        private static float SquaredL2(float[] a, float[] b)
-        {
-            var sum = 0f;
-            for (var i = 0; i < a.Length; i++)
-            {
-                var diff = a[i] - b[i];
-                sum += diff * diff;
-            }
-            return sum;
-        }
-
-        private static float ComputeNorm(float[] vector)
-        {
-            var sum = 0f;
-            for (var i = 0; i < vector.Length; i++)
-            {
-                sum += vector[i] * vector[i];
-            }
-            return (float)Math.Sqrt(sum);
-        }
-
-        private static float Cosine(float[] query, float[] vector, float vectorNorm)
-        {
-            var queryNorm = ComputeNorm(query);
-            if (queryNorm == 0f || vectorNorm == 0f)
-            {
-                return 0f;
-            }
-
-            return Dot(query, vector) / (queryNorm * vectorNorm);
-        }
 
         private sealed record VectorEntry(float[] Vector, float Norm);
 

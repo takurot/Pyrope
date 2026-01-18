@@ -119,7 +119,7 @@ namespace Pyrope.GarnetServer.Vector
                 var centroids = TrainKMeans(allVectors, k);
 
                 // Precompile centroid norms for faster assignment/search if needed
-                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? ComputeNorm(c) : 0f).ToList();
+                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(c) : 0f).ToList();
 
                 // 3. Assign
                 var newLists = new Dictionary<int, List<KeyValuePair<string, VectorEntry>>>();
@@ -164,13 +164,15 @@ namespace Pyrope.GarnetServer.Vector
                 var seenIds = new HashSet<string>();
                 int scanned = 0;
 
+                float queryNorm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(query) : 0f;
+
                 // 1. Search Buffer (Exact)
                 foreach (var kvp in _buffer)
                 {
                     if (scanned >= maxScans) break;
                     scanned++;
 
-                    float score = ComputeScore(query, kvp.Value);
+                    float score = ComputeScore(query, kvp.Value, queryNorm);
                     heap.Enqueue(new SearchResult(kvp.Key, score), score);
                     seenIds.Add(kvp.Key);
 
@@ -186,7 +188,7 @@ namespace Pyrope.GarnetServer.Vector
                     {
                         // Use precomputed norm for centroids
                         var cEntry = new VectorEntry(_centroids[i], _centroidNorms[i]);
-                        float s = ComputeScore(query, cEntry);
+                        float s = ComputeScore(query, cEntry, queryNorm);
                         centroidScores.Add((i, s));
                     }
 
@@ -208,7 +210,7 @@ namespace Pyrope.GarnetServer.Vector
                                 if (seenIds.Contains(item.Key)) continue; // Already found in buffer
 
                                 scanned++;
-                                float score = ComputeScore(query, item.Value);
+                                float score = ComputeScore(query, item.Value, queryNorm);
                                 heap.Enqueue(new SearchResult(item.Key, score), score);
                                 if (heap.Count > topK) heap.Dequeue();
                             }
@@ -337,7 +339,7 @@ namespace Pyrope.GarnetServer.Vector
                 bool changed = false;
 
                 // Temp norms for centroids during training iteration
-                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? ComputeNorm(c) : 0f).ToList();
+                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(c) : 0f).ToList();
 
                 // Assign
                 foreach (var vec in data)
@@ -386,10 +388,12 @@ namespace Pyrope.GarnetServer.Vector
             // So we start with MinValue.
             float bestScore = float.MinValue;
 
+            float vecNorm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(vec) : 0f;
+
             for (int i = 0; i < centroids.Count; i++)
             {
                 // Fix: Pass centroid norm
-                float score = ComputeScore(vec, new VectorEntry(centroids[i], centroidNorms[i]));
+                float score = ComputeScore(vec, new VectorEntry(centroids[i], centroidNorms[i]), vecNorm);
 
                 if (score > bestScore)
                 {
@@ -415,48 +419,22 @@ namespace Pyrope.GarnetServer.Vector
         {
             var copy = new float[vector.Length];
             Array.Copy(vector, copy, vector.Length);
-            var norm = Metric == VectorMetric.Cosine ? ComputeNorm(copy) : 0f;
+            var norm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(copy) : 0f;
             return new VectorEntry(copy, norm);
         }
 
-        private float ComputeScore(float[] query, VectorEntry entry)
+        private float ComputeScore(float[] query, VectorEntry entry, float queryNorm)
         {
             return Metric switch
             {
-                VectorMetric.L2 => -SquaredL2(query, entry.Vector),
-                VectorMetric.InnerProduct => Dot(query, entry.Vector),
-                VectorMetric.Cosine => Cosine(query, entry.Vector, entry.Norm),
+                VectorMetric.L2 => -VectorMath.L2Squared(query, entry.Vector),
+                VectorMetric.InnerProduct => VectorMath.DotProduct(query, entry.Vector),
+                VectorMetric.Cosine => VectorMath.Cosine(query, entry.Vector, queryNorm, entry.Norm),
                 _ => throw new InvalidOperationException()
             };
         }
 
-        private static float Dot(float[] a, float[] b)
-        {
-            var sum = 0f;
-            for (var i = 0; i < a.Length; i++) sum += a[i] * b[i];
-            return sum;
-        }
 
-        private static float SquaredL2(float[] a, float[] b)
-        {
-            var sum = 0f;
-            for (var i = 0; i < a.Length; i++) { var d = a[i] - b[i]; sum += d * d; }
-            return sum;
-        }
-
-        private static float ComputeNorm(float[] vector)
-        {
-            var sum = 0f;
-            for (var i = 0; i < vector.Length; i++) sum += vector[i] * vector[i];
-            return (float)Math.Sqrt(sum);
-        }
-
-        private static float Cosine(float[] query, float[] vector, float vectorNorm)
-        {
-            var queryNorm = ComputeNorm(query);
-            if (queryNorm == 0f || vectorNorm == 0f) return 0f;
-            return Dot(query, vector) / (queryNorm * vectorNorm);
-        }
 
         private sealed record VectorEntry(float[] Vector, float Norm);
 

@@ -566,7 +566,10 @@ namespace Pyrope.GarnetServer.Extensions
                         DateTimeOffset.UtcNow,
                         DateTimeOffset.UtcNow);
 
-                    var index = IndexRegistry.GetOrCreate(request.TenantId, request.IndexName, request.Vector.Length, VectorMetric.L2);
+                    if (!IndexRegistry.TryGetIndex(request.TenantId, request.IndexName, out var index))
+                    {
+                        index = IndexRegistry.GetOrCreate(request.TenantId, request.IndexName, request.Vector.Length, VectorMetric.L2);
+                    }
 
                     if (_commandType == VectorCommandType.Add)
                     {
