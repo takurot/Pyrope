@@ -42,6 +42,7 @@ namespace Pyrope.GarnetServer.Extensions
         private readonly IPredictivePrefetcher? _prefetcher;
         private readonly IPrefetchBackgroundQueue? _prefetchQueue;
         private readonly ILogger? _logger;
+        private readonly IBillingMeter? _billingMeter;
 
         public VectorCommandSet(
             VectorCommandType commandType,
@@ -57,7 +58,8 @@ namespace Pyrope.GarnetServer.Extensions
             CanonicalKeyMap? canonicalKeyMap = null,
             IPredictivePrefetcher? prefetcher = null,
             IPrefetchBackgroundQueue? prefetchQueue = null,
-            ILogger? logger = null)
+            ILogger? logger = null,
+            IBillingMeter? billingMeter = null)
         {
             _commandType = commandType;
             _resultCache = resultCache;
@@ -72,6 +74,7 @@ namespace Pyrope.GarnetServer.Extensions
             _prefetcher = prefetcher;
             _prefetchQueue = prefetchQueue;
             _logger = logger;
+            _billingMeter = billingMeter;
         }
 
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
@@ -147,6 +150,16 @@ namespace Pyrope.GarnetServer.Extensions
                     {
                         return true;
                     }
+                    var requestRecorded = false;
+                    void RecordBillingRequest(bool hit)
+                    {
+                        if (requestRecorded)
+                        {
+                            return;
+                        }
+                        requestRecorded = true;
+                        _billingMeter?.RecordRequest(request.TenantId, hit);
+                    }
                     var traceEnabled = request.Trace;
                     var requestId = request.RequestId;
                     if (traceEnabled && string.IsNullOrWhiteSpace(requestId))
@@ -214,6 +227,7 @@ namespace Pyrope.GarnetServer.Extensions
                                     WriteResults(ref output, cachedHits, request.IncludeMeta, traceJson);
                                     _metrics?.RecordCacheHit();
                                     _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                    RecordBillingRequest(true);
                                     return true;
                                 }
                             }
@@ -247,6 +261,7 @@ namespace Pyrope.GarnetServer.Extensions
                                             WriteResults(ref output, aliasHits, request.IncludeMeta, traceJson);
                                             _metrics?.RecordCacheHit();
                                             _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                            RecordBillingRequest(true);
                                             return true;
                                         }
                                     }
@@ -281,6 +296,7 @@ namespace Pyrope.GarnetServer.Extensions
                                             WriteResults(ref output, l1Hits, request.IncludeMeta, traceJson);
                                             _metrics?.RecordCacheHit(); // Count as hit (maybe distinguish later)
                                             _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                            RecordBillingRequest(true);
                                             return true;
                                         }
                                     }
@@ -384,6 +400,7 @@ namespace Pyrope.GarnetServer.Extensions
                                                 WriteResults(ref output, l2Hits, request.IncludeMeta, traceJson);
                                                 _metrics?.RecordCacheHit();
                                                 _metrics?.RecordSearchLatency(TimeSpan.FromMilliseconds(ElapsedMilliseconds(totalStart, totalEnd)));
+                                                RecordBillingRequest(true);
                                                 return true;
                                             }
                                         }
@@ -406,15 +423,18 @@ namespace Pyrope.GarnetServer.Extensions
                     if (forceCacheOnly && !cacheHit)
                     {
                         WriteErrorCode(ref output, VectorErrorCodes.Busy, "SLO mode: cache-only.");
+                        RecordBillingRequest(false);
                         return true;
                     }
 
                     object? budgetAdjustment = null;
                     var searchOptions = _sloGuardrails?.GetSearchOptions(request.TenantId, request.IndexName) ?? new SearchOptions();
 
+                    var estimatedCost = CostCalculator.EstimateSearchCost(index.GetStats(), request.TopK);
+                    _billingMeter?.RecordCompute(request.TenantId, estimatedCost);
+
                     if (_quotaEnforcer != null)
                     {
-                        var estimatedCost = CostCalculator.EstimateSearchCost(index.GetStats(), request.TopK);
                         _quotaEnforcer.RecordCost(request.TenantId, estimatedCost);
 
                         if (_quotaEnforcer.IsOverBudget(request.TenantId))
@@ -465,6 +485,7 @@ namespace Pyrope.GarnetServer.Extensions
                         })
                         : null;
                     WriteResults(ref output, results, request.IncludeMeta, tracePayload);
+                    RecordBillingRequest(cacheHit);
 
                     // --- CACHE SET ---
                     if (policyDecision.ShouldCache && queryKey != null && _resultCache != null)
@@ -580,11 +601,19 @@ namespace Pyrope.GarnetServer.Extensions
                         }
 
                         index.Add(request.Id, request.Vector);
+                        _billingMeter?.RecordVectorBytes(request.TenantId, BillingMeter.EstimateVectorRecordBytes(record));
                     }
                     else if (_commandType == VectorCommandType.Upsert)
                     {
+                        long oldSize = 0;
+                        if (Store.TryGet(request.TenantId, request.IndexName, request.Id, out var existing))
+                        {
+                            oldSize = BillingMeter.EstimateVectorRecordBytes(existing);
+                        }
                         Store.Upsert(record);
                         index.Upsert(request.Id, request.Vector);
+                        var newSize = BillingMeter.EstimateVectorRecordBytes(record);
+                        _billingMeter?.RecordVectorBytes(request.TenantId, newSize - oldSize);
                     }
 
                     else
@@ -657,12 +686,21 @@ namespace Pyrope.GarnetServer.Extensions
 
             if (IndexRegistry.TryGetIndex(tenantId, indexName, out var index))
             {
+                long removedBytes = 0;
+                if (Store.TryGet(tenantId, indexName, id, out var existing))
+                {
+                    removedBytes = BillingMeter.EstimateVectorRecordBytes(existing);
+                }
                 var deleted = Store.TryMarkDeleted(tenantId, indexName, id);
                 index.Delete(id);
 
                 if (deleted)
                 {
                     IndexRegistry.IncrementEpoch(tenantId, indexName);
+                    if (removedBytes > 0)
+                    {
+                        _billingMeter?.RecordVectorBytes(tenantId, -removedBytes);
+                    }
                 }
             }
             else

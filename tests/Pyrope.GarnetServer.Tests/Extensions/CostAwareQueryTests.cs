@@ -120,10 +120,11 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var result = db.Execute("VEC.SEARCH", "tenant_poor", "idx1", "TOPK", "1", "VECTOR", "[1,0]", "TRACE", "API_KEY", TenantApiKey + "-tenant_poor");
 
             // Result format: [ [hits], traceJson ]
-            var arr = (RedisResult[])result;
+            var arr = (RedisResult[]?)result;
+            Assert.NotNull(arr);
             Assert.Equal(2, arr.Length);
 
-            var traceJson = arr[1].ToString();
+            var traceJson = arr[1].ToString() ?? string.Empty;
             Assert.Contains("budget_exceeded", traceJson);
             Assert.Contains("BudgetAdjustment", traceJson);
             Assert.Contains("original_max_scans", traceJson);
@@ -141,8 +142,9 @@ namespace Pyrope.GarnetServer.Tests.Extensions
 
             var result = db.Execute("VEC.SEARCH", "tenant_rich", "idx1", "TOPK", "1", "VECTOR", "[1,0]", "TRACE", "API_KEY", TenantApiKey + "-tenant_rich");
 
-            var arr = (RedisResult[])result;
-            var traceJson = arr[1].ToString();
+            var arr = (RedisResult[]?)result;
+            Assert.NotNull(arr);
+            var traceJson = arr[1].ToString() ?? string.Empty;
 
             // Should NOT contain adjustment or reason
             Assert.DoesNotContain("budget_exceeded", traceJson);

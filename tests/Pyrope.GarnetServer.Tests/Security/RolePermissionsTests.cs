@@ -9,6 +9,7 @@ namespace Pyrope.GarnetServer.Tests.Security
         [InlineData(Role.Reader, Permission.IndexRead, true)]
         [InlineData(Role.Reader, Permission.TenantRead, true)]
         [InlineData(Role.Reader, Permission.PolicyRead, true)]
+        [InlineData(Role.Reader, Permission.BillingRead, true)]
         [InlineData(Role.Reader, Permission.IndexCreate, false)]
         [InlineData(Role.Reader, Permission.IndexDelete, false)]
         [InlineData(Role.Reader, Permission.IndexBuild, false)]
@@ -28,6 +29,7 @@ namespace Pyrope.GarnetServer.Tests.Security
         [InlineData(Role.Operator, Permission.CacheInvalidate, true)]
         [InlineData(Role.Operator, Permission.PolicyUpdate, true)]
         [InlineData(Role.Operator, Permission.AuditRead, true)]
+        [InlineData(Role.Operator, Permission.BillingRead, true)]
         [InlineData(Role.Operator, Permission.IndexCreate, false)]
         [InlineData(Role.Operator, Permission.IndexDelete, false)]
         [InlineData(Role.Operator, Permission.UserManage, false)]
@@ -52,6 +54,7 @@ namespace Pyrope.GarnetServer.Tests.Security
         [InlineData(Permission.PolicyUpdate)]
         [InlineData(Permission.PolicyRead)]
         [InlineData(Permission.AuditRead)]
+        [InlineData(Permission.BillingRead)]
         public void TenantAdmin_HasAllPermissions(Permission permission)
         {
             Assert.True(RolePermissions.HasPermission(Role.TenantAdmin, permission));
@@ -64,7 +67,7 @@ namespace Pyrope.GarnetServer.Tests.Security
             var operatorPerms = RolePermissions.GetPermissions(Role.Operator);
             var adminPerms = RolePermissions.GetPermissions(Role.TenantAdmin);
 
-            Assert.Equal(3, readerPerms.Count);
+            Assert.Equal(4, readerPerms.Count);
             Assert.True(operatorPerms.Count > readerPerms.Count);
             Assert.True(adminPerms.Count >= operatorPerms.Count);
         }

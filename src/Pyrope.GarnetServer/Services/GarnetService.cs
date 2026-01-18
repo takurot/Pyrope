@@ -24,6 +24,7 @@ namespace Pyrope.GarnetServer.Services
         private readonly IPredictivePrefetcher _prefetcher;
         private readonly IPrefetchBackgroundQueue _prefetchQueue;
         private readonly ILogger<GarnetService> _logger;
+        private readonly IBillingMeter _billingMeter;
 
         public GarnetService(
             ResultCache resultCache,
@@ -38,6 +39,7 @@ namespace Pyrope.GarnetServer.Services
             CanonicalKeyMap canonicalKeyMap,
             IPredictivePrefetcher prefetcher,
             IPrefetchBackgroundQueue prefetchQueue,
+            IBillingMeter billingMeter,
             ILogger<GarnetService> logger,
             string[]? args = null)
         {
@@ -52,6 +54,7 @@ namespace Pyrope.GarnetServer.Services
             _canonicalKeyMap = canonicalKeyMap;
             _prefetcher = prefetcher;
             _prefetchQueue = prefetchQueue;
+            _billingMeter = billingMeter;
             _logger = logger;
             // Filter out ASP.NET Core specific arguments before passing to Garnet
             var garnetArgs = (args ?? Array.Empty<string>())
@@ -88,12 +91,12 @@ namespace Pyrope.GarnetServer.Services
         private void RegisterCommands()
         {
             // Register Custom Commands
-            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, null, null, null, null, _quotaEnforcer, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert, null, null, null, null, _quotaEnforcer, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
-            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del, null, null, null, null, _quotaEnforcer, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
+            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
+            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
 
             // VEC.SEARCH with Caching & Policy & Metrics & LSH & Semantic Clustering & Canonical Aliasing
-            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer, _tenantAuthenticator, _sloGuardrails, _clusterRegistry, _canonicalKeyMap, _prefetcher, _prefetchQueue, _logger), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer, _tenantAuthenticator, _sloGuardrails, _clusterRegistry, _canonicalKeyMap, _prefetcher, _prefetchQueue, _logger, _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
             // VEC.STATS
             _server.Register.NewCommand("VEC.STATS", CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, _metricsCollector, null, null, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });

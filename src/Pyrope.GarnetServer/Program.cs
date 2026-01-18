@@ -63,11 +63,30 @@ namespace Pyrope.GarnetServer
                 }
             });
 
+            // --- Billing/Metering (P7) ---
+            builder.Services.Configure<BillingOptions>(options =>
+            {
+                if (double.TryParse(builder.Configuration["Billing:CostUnitSeconds"], out var costSeconds))
+                {
+                    options.CostUnitSeconds = costSeconds;
+                }
+                if (int.TryParse(builder.Configuration["Billing:LogIntervalSeconds"], out var interval))
+                {
+                    options.LogIntervalSeconds = interval;
+                }
+                if (int.TryParse(builder.Configuration["Billing:MaxInMemoryEntries"], out var maxEntries))
+                {
+                    options.MaxInMemoryEntries = maxEntries;
+                }
+                options.LogPath = builder.Configuration["Billing:LogPath"];
+            });
+
             // Register Core Services
             builder.Services.AddSingleton(Pyrope.GarnetServer.Extensions.VectorCommandSet.SharedIndexRegistry);
             builder.Services.AddSingleton<MemoryCacheStorage>();
             builder.Services.AddSingleton<ICacheStorage>(sp => sp.GetRequiredService<MemoryCacheStorage>());
             builder.Services.AddSingleton<ICacheAdmin>(sp => sp.GetRequiredService<MemoryCacheStorage>());
+            builder.Services.AddSingleton<ICacheUsageProvider>(sp => sp.GetRequiredService<MemoryCacheStorage>());
             builder.Services.AddSingleton<IMetricsCollector, MetricsCollector>();
             builder.Services.AddSingleton(sp => (MetricsCollector)sp.GetRequiredService<IMetricsCollector>()); // Alias if needed
             builder.Services.AddSingleton<ISystemUsageProvider, SystemUsageProvider>();
@@ -83,6 +102,8 @@ namespace Pyrope.GarnetServer
             builder.Services.AddSingleton<ISloGuardrails, SloGuardrails>();
             builder.Services.AddSingleton<SemanticClusterRegistry>();
             builder.Services.AddSingleton<CanonicalKeyMap>();
+            builder.Services.AddSingleton<IBillingLogStore, BillingLogStore>();
+            builder.Services.AddSingleton<IBillingMeter, BillingMeter>();
 
             // --- RBAC (P5-6) ---
             builder.Services.AddSingleton<TenantUserRegistry>();

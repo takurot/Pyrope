@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Pyrope.GarnetServer.Services;
 
 namespace Pyrope.GarnetServer.Model
 {
-    public class MemoryCacheStorage : ICacheStorage, ICacheAdmin
+    public class MemoryCacheStorage : ICacheStorage, ICacheAdmin, ICacheUsageProvider
     {
         private readonly ConcurrentDictionary<string, CacheEntry> _store = new();
         private readonly ConcurrentDictionary<string, long> _tenantUsageBytes = new(StringComparer.Ordinal);
@@ -121,6 +122,21 @@ namespace Pyrope.GarnetServer.Model
             }
 
             return removed;
+        }
+
+        public long GetTenantUsageBytes(string tenantId)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                return 0;
+            }
+
+            return _tenantUsageBytes.TryGetValue(tenantId, out var usage) ? usage : 0;
+        }
+
+        public IReadOnlyDictionary<string, long> GetAllTenantUsageBytes()
+        {
+            return new Dictionary<string, long>(_tenantUsageBytes);
         }
 
         private void RemoveEntry(string key, CacheEntry entry)

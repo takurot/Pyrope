@@ -15,11 +15,13 @@ namespace Pyrope.GarnetServer.Controllers
     {
         private readonly VectorIndexRegistry _registry;
         private readonly IAuditLogger _auditLogger;
+        private readonly IBillingMeter _billingMeter;
 
-        public IndexController(VectorIndexRegistry registry, IAuditLogger auditLogger)
+        public IndexController(VectorIndexRegistry registry, IAuditLogger auditLogger, IBillingMeter billingMeter)
         {
             _registry = registry;
             _auditLogger = auditLogger;
+            _billingMeter = billingMeter;
         }
 
         [HttpPost]
@@ -127,6 +129,7 @@ namespace Pyrope.GarnetServer.Controllers
                 try
                 {
                     index.Snapshot(request.Path);
+                    _billingMeter.RecordSnapshot(tenantId, indexName, request.Path);
 
                     // Audit log
                     _auditLogger.Log(new AuditEvent(
