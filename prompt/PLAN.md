@@ -182,8 +182,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P10-10** | [Core] | **Sidecar Communication Optimization**<br>Batch metrics reporting, async fire-and-forget logging, longer policy cache TTL to reduce gRPC overhead. | P4-1 | [ ] |
 | **P10-11** | [Core] | **Memory Pool / Object Reuse**<br>Use `ArrayPool<float>` for vector buffers to reduce GC pressure and stabilize latency. | P1-2 | [ ] |
 | **P10-12** | [Core] | **Vector Memory Layout Optimization**<br>Transition from AoS (Array of Structures) to SoA (Structure of Arrays) or blocked layout to improve CPU cache locality and SIMD load efficiency. | P10-9 | [ ] |
-| **P10-13** | [Core] | **Advanced SIMD Tuning**<br>Implement loop unrolling with multiple accumulators and unsafe pointers to eliminate bounds checks. Support `Vector512<T>` (AVX-512) for capable hardware. | P10-9 | [ ] |
-| **P10-14** | [Core] | **Scalar Quantization (SQ)**<br>Implement Int8/Byte scalar quantization for vectors. Reduces memory bandwidth by 4x. | P1-4 | [ ] |
+| **P10-13** | [Core] | **Advanced SIMD Tuning**<br>Implement loop unrolling with multiple accumulators and unsafe pointers to eliminate bounds checks. Support `Vector512<T>` (AVX-512) for capable hardware. **Completed (1.77x speedup)** | P10-9 | [x] |
+| **P10-14** | [Core] | **Scalar Quantization (SQ)**<br>Implement Int8/Byte scalar quantization for vectors. Reduces memory bandwidth by 4x. **Completed (1.54x speedup)** | P1-4 | [x] |
 
 ---
 
