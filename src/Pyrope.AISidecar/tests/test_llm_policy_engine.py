@@ -9,7 +9,6 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 from dataclasses import dataclass
 
-
 # Import will fail until we implement; that's expected in TDD Red phase
 try:
     from llm_policy_engine import LLMPolicyEngine, SystemMetrics

@@ -6,7 +6,6 @@ from math import sqrt
 from typing import Mapping, Optional, Sequence
 import time
 
-
 FILTER_TYPE_ENCODING = {
     "none": 0.0,
     "tag": 1.0,
