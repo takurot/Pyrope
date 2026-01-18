@@ -115,11 +115,8 @@ namespace Pyrope.GarnetServer.Vector
                 _entries[id] = CreateEntry(vector);
                 
                 // Quantize
-                if (EnableQuantization || true) // Always quantize for now to support switching modes? Or only if enabled?
+                if (EnableQuantization)
                 {
-                    // Always maintain quantized store for benchmark purposes if we enable it later?
-                    // Better: Only if enabled. But for benchmark, we might enable it *after* loading.
-                    // So let's lazily quantize or just Quantize on Add.
                     var qv = ScalarQuantizer.Quantize(vector, out float min, out float max);
                     _quantizedVectors[id] = qv;
                     _quantizationParams[id] = (min, max);
@@ -140,9 +137,13 @@ namespace Pyrope.GarnetServer.Vector
             try
             {
                 _entries[id] = CreateEntry(vector);
-                var qv = ScalarQuantizer.Quantize(vector, out float min, out float max);
-                _quantizedVectors[id] = qv;
-                _quantizationParams[id] = (min, max);
+                
+                if (EnableQuantization)
+                {
+                    var qv = ScalarQuantizer.Quantize(vector, out float min, out float max);
+                    _quantizedVectors[id] = qv;
+                    _quantizationParams[id] = (min, max);
+                }
             }
             finally
             {
@@ -208,6 +209,8 @@ namespace Pyrope.GarnetServer.Vector
                      qQuery = ScalarQuantizer.Quantize(query, out _, out _);
                      
                      // SQ8 Optimized Loop
+                     // NOTE: This uses direct byte comparison (DotProduct8Bit) which approximates distance.
+                     // It does not account for per-vector Min/Max scaling (LSQ), so ranking is approximate.
                      foreach (var kvp in _quantizedVectors)
                      {
                         if (scanned >= scanLimit) break;
