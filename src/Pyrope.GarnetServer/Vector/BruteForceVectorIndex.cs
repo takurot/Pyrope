@@ -9,13 +9,15 @@ namespace Pyrope.GarnetServer.Vector
     public class BruteForceVectorIndex : IVectorIndex
     {
         // Dense Index Mapping (P10-12)
-        private readonly List<VectorEntry> _vectors = new();
+        // Nullable entries to support GC reclamation on delete
+        private readonly List<VectorEntry?> _vectors = new();
         private readonly List<string> _ids = new();
         private readonly Dictionary<string, int> _idMap = new();
         private readonly List<bool> _isDeleted = new();
         
         // Quantized Data (P10-12)
-        private readonly List<byte[]> _quantizedVectors = new();
+        // Nullable byte arrays for GC reclamation
+        private readonly List<byte[]?> _quantizedVectors = new();
         private readonly List<(float Min, float Max)> _quantizationParams = new();
         
         private readonly ReaderWriterLockSlim _lock = new();
@@ -45,12 +47,14 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterReadLock();
             try
             {
-                // Serialize as dictionary to maintain compatibility (slow but safe)
                 var dto = new Dictionary<string, VectorEntryDto>(_vectors.Count);
                 for (int i = 0; i < _vectors.Count; i++)
                 {
                     if (_isDeleted[i]) continue;
-                    dto[_ids[i]] = new VectorEntryDto { Vector = _vectors[i].Vector, Norm = _vectors[i].Norm };
+                    var entry = _vectors[i];
+                    if (entry == null) continue; // Should effectively match isDeleted
+
+                    dto[_ids[i]] = new VectorEntryDto { Vector = entry.Vector, Norm = entry.Norm };
                 }
                 var json = System.Text.Json.JsonSerializer.Serialize(dto);
                 System.IO.File.WriteAllText(path, json);
@@ -102,7 +106,7 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterReadLock();
             try
             {
-                int activeCount = _idMap.Count; // idMap only contains active keys
+                int activeCount = _idMap.Count; 
                 return new IndexStats(activeCount, Dimension, Metric.ToString());
             }
             finally
@@ -125,7 +129,6 @@ namespace Pyrope.GarnetServer.Vector
                 }
 
                 float norm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(vector) : 0f;
-                // Copy vector to avoid external modification
                 var vecCopy = new float[vector.Length];
                 Array.Copy(vector, vecCopy, vector.Length);
 
@@ -154,10 +157,7 @@ namespace Pyrope.GarnetServer.Vector
             }
             else
             {
-                // Keep list structure aligned even if disabled, or handle logic?
-                // If disabled, we might have empty list or need to fill with null/empty to keep index sync.
-                // Simpler: Add placeholder or handle index mismatch.
-                // Let's add empty/default to keep indices aligned for simplicity.
+                // Consistent initialization
                 _quantizedVectors.Add(Array.Empty<byte>());
                 _quantizationParams.Add(default);
             }
@@ -179,15 +179,20 @@ namespace Pyrope.GarnetServer.Vector
                 {
                     // Update existing
                     _vectors[index] = new VectorEntry(vecCopy, norm);
-                    // Ensure it is not deleted (if reviving) - though idMap usually implies active.
-                    // If we support revive logic, we check isDeleted.
                     _isDeleted[index] = false;
 
+                    // Fix: Always update quantized state to avoid stale data
                     if (EnableQuantization)
                     {
                         var qv = ScalarQuantizer.Quantize(vector, out float min, out float max);
                         _quantizedVectors[index] = qv;
                         _quantizationParams[index] = (min, max);
+                    }
+                    else
+                    {
+                        // Reset to empty if disabled, ensuring consistency
+                        _quantizedVectors[index] = Array.Empty<byte>();
+                        _quantizationParams[index] = default;
                     }
                 }
                 else
@@ -212,8 +217,11 @@ namespace Pyrope.GarnetServer.Vector
                 {
                     _isDeleted[index] = true;
                     _idMap.Remove(id);
-                    // We don't remove from Lists to keep indices stable.
-                    // This creates fragmentation, but we assume simple usage or later compaction.
+                    
+                    // Fix: Clear references to allow GC
+                    _vectors[index] = null;
+                    _quantizedVectors[index] = null;
+                    
                     return true;
                 }
                 return false;
@@ -229,13 +237,16 @@ namespace Pyrope.GarnetServer.Vector
             _lock.EnterReadLock();
             try
             {
-                // Create snapshot of active vectors
                 var list = new List<KeyValuePair<string, float[]>>(_idMap.Count);
                 for(int i=0; i<_vectors.Count; i++)
                 {
                     if (!_isDeleted[i])
                     {
-                        list.Add(new KeyValuePair<string, float[]>(_ids[i], _vectors[i].Vector));
+                        var v = _vectors[i];
+                        if (v != null)
+                        {
+                            list.Add(new KeyValuePair<string, float[]>(_ids[i], v.Vector));
+                        }
                     }
                 }
                 return list;
@@ -265,17 +276,19 @@ namespace Pyrope.GarnetServer.Vector
                 var heap = new PriorityQueue<SearchResult, float>();
                 int scanned = 0;
                 
-                // P10-11: Pooling
-                byte[]? qQuery = null;
+                byte[]? qQueryBuffer = null;
                 try
                 {
                     if (EnableQuantization)
                     {
-                        qQuery = ArrayPool<byte>.Shared.Rent(Dimension);
-                        ScalarQuantizer.Quantize(query, qQuery.AsSpan(0, Dimension), out _, out _);
+                        // P10-11: Rent from pool
+                        qQueryBuffer = ArrayPool<byte>.Shared.Rent(Dimension);
+                        // Slice strictly to Dimension
+                        Span<byte> qQuerySpan = qQueryBuffer.AsSpan(0, Dimension);
+                        
+                        ScalarQuantizer.Quantize(query, qQuerySpan, out _, out _);
                         
                         // Optimized Loop P10-12
-                        // Access List directly by index
                         for (int i = 0; i < count; i++)
                         {
                             if (_isDeleted[i]) continue;
@@ -283,14 +296,22 @@ namespace Pyrope.GarnetServer.Vector
                             scanned++;
 
                             var qTarget = _quantizedVectors[i];
-                            // Check if valid quantization exists (in case it was added while disabled)
-                            if (qTarget == null || qTarget.Length == 0) continue; // fallback or skip?
+                            
+                            // Check for validity (might be null if deleted or empty if added when disabled)
+                            if (qTarget == null || qTarget.Length == 0) continue; 
+
+                            // Fix: Use Span overload passing sliced query and target
+                            // qTarget should technically be Dimension length if valid
+                            ReadOnlySpan<byte> targetSpan = new ReadOnlySpan<byte>(qTarget);
+                            
+                            // Safety check for target length (though InternalAdd guarantees correctness)
+                            if (targetSpan.Length != Dimension) continue;
 
                             float score = Metric switch
                             {
-                                VectorMetric.L2 => -VectorMath.L2Squared8Bit(qQuery, qTarget),
-                                VectorMetric.InnerProduct => VectorMath.DotProduct8Bit(qQuery, qTarget),
-                                VectorMetric.Cosine => VectorMath.DotProduct8Bit(qQuery, qTarget), // approx
+                                VectorMetric.L2 => -VectorMath.L2Squared8Bit(qQuerySpan, targetSpan),
+                                VectorMetric.InnerProduct => VectorMath.DotProduct8Bit(qQuerySpan, targetSpan),
+                                VectorMetric.Cosine => VectorMath.DotProduct8Bit(qQuerySpan, targetSpan), 
                                 _ => throw new InvalidOperationException()
                             };
 
@@ -309,6 +330,8 @@ namespace Pyrope.GarnetServer.Vector
                             scanned++;
 
                             var entry = _vectors[i];
+                            if (entry == null) continue;
+
                             float score = Metric switch
                             {
                                 VectorMetric.L2 => -VectorMath.L2SquaredUnsafe(query, entry.Vector),
@@ -324,7 +347,7 @@ namespace Pyrope.GarnetServer.Vector
                 }
                 finally
                 {
-                    if (qQuery != null) ArrayPool<byte>.Shared.Return(qQuery);
+                    if (qQueryBuffer != null) ArrayPool<byte>.Shared.Return(qQueryBuffer);
                 }
 
                 if (heap.Count == 0) return Array.Empty<SearchResult>();
