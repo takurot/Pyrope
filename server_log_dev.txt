@@ -1,0 +1,29 @@
+[31m    _________
+   /_||___||_\      [0mGarnet 1.0.91 64 bit; standalone mode[31m
+   '. \   / .'      [0mListening on: 127.0.0.1:4061 and 1 more[31m
+     '.\ /.'        [35mhttps://aka.ms/GetGarnet[31m
+       '.'
+[0m
+* Ready to accept connections
+info: Pyrope.GarnetServer.Services.PrefetchBackgroundQueue[0]
+      Prefetch background queue starting.
+info: Pyrope.GarnetServer.Services.PredictivePrefetcher[0]
+      Predictive Prefetching disabled (no endpoint).
+info: Pyrope.GarnetServer.Services.SidecarMetricsReporter[0]
+      Sidecar metrics reporting disabled (no endpoint configured).
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Volumes/Storage/src/Pyrope/src/Pyrope.GarnetServer
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/tenants - application/json;+charset=utf-8 36
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/tenants - 500 - - 23.3660ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Pyrope.GarnetServer.Services.PrefetchBackgroundQueue[0]
+      Prefetch background queue stopping.

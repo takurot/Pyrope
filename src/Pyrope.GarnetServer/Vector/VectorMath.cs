@@ -252,6 +252,172 @@ namespace Pyrope.GarnetServer.Vector
             return sum;
         }
 
+        public static float L2Squared(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+        {
+            if (a.Length != b.Length) throw new ArgumentException("Vector dimension mismatch");
+            return L2SquaredUnsafe(a, b);
+        }
+
+        public static float DotProduct(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+        {
+            if (a.Length != b.Length) throw new ArgumentException("Vector dimension mismatch");
+            return DotProductUnsafe(a, b);
+        }
+
+        public static float Cosine(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+        {
+            // Assume normalized if this is called in hot path, or compute norm?
+            // Safest to compute norm.
+            float nA = ComputeNorm(a);
+            float nB = ComputeNorm(b);
+            return DotProductUnsafe(a, b) / (nA * nB);
+        }
+
+        public static float ComputeNorm(ReadOnlySpan<float> vector)
+        {
+            // Similar implementation to array version
+            int vectorSize = Vector<float>.Count;
+            int length = vector.Length;
+            int i = 0;
+            float sum = 0f;
+
+            if (length >= vectorSize)
+            {
+                var vSum = Vector<float>.Zero;
+                int end = length - vectorSize;
+
+                // Unsafe span access
+                unsafe
+                {
+                    fixed (float* p = vector)
+                    {
+                        while (i <= end)
+                        {
+                            var v = *(Vector<float>*)(p + i);
+                            vSum += v * v;
+                            i += vectorSize;
+                        }
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(vSum, System.Numerics.Vector<float>.One);
+            }
+
+            for (; i < length; i++)
+            {
+                sum += vector[i] * vector[i];
+            }
+            return MathF.Sqrt(sum);
+        }
+
+        public static unsafe float L2SquaredUnsafe(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+        {
+            int vectorSize = System.Numerics.Vector<float>.Count;
+            int length = a.Length;
+            int i = 0;
+            float sum = 0f;
+
+            if (length >= vectorSize * 4)
+            {
+                var acc1 = System.Numerics.Vector<float>.Zero;
+                var acc2 = System.Numerics.Vector<float>.Zero;
+                var acc3 = System.Numerics.Vector<float>.Zero;
+                var acc4 = System.Numerics.Vector<float>.Zero;
+                int end = length - (vectorSize * 4);
+
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= end)
+                    {
+                        var d1 = *(System.Numerics.Vector<float>*)(pA + i) - *(System.Numerics.Vector<float>*)(pB + i);
+                        var d2 = *(System.Numerics.Vector<float>*)(pA + i + vectorSize) - *(System.Numerics.Vector<float>*)(pB + i + vectorSize);
+                        var d3 = *(System.Numerics.Vector<float>*)(pA + i + vectorSize * 2) - *(System.Numerics.Vector<float>*)(pB + i + vectorSize * 2);
+                        var d4 = *(System.Numerics.Vector<float>*)(pA + i + vectorSize * 3) - *(System.Numerics.Vector<float>*)(pB + i + vectorSize * 3);
+                        acc1 += d1 * d1;
+                        acc2 += d2 * d2;
+                        acc3 += d3 * d3;
+                        acc4 += d4 * d4;
+                        i += vectorSize * 4;
+                    }
+                }
+                var finalAcc = acc1 + acc2 + acc3 + acc4;
+                sum += System.Numerics.Vector.Dot(finalAcc, System.Numerics.Vector<float>.One);
+            }
+
+            // Remainder
+            if (i <= length - vectorSize)
+            {
+                var acc = System.Numerics.Vector<float>.Zero;
+                fixed (float* pA = a)
+                fixed (float* pB = b)
+                {
+                    while (i <= length - vectorSize)
+                    {
+                        var diff = *(System.Numerics.Vector<float>*)(pA + i) - *(System.Numerics.Vector<float>*)(pB + i);
+                        acc += diff * diff;
+                        i += vectorSize;
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(acc, System.Numerics.Vector<float>.One);
+            }
+
+            for (; i < length; i++)
+            {
+                var diff = a[i] - b[i];
+                sum += diff * diff;
+            }
+
+            return sum;
+        }
+
+        public static unsafe float DotProductUnsafe(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+        {
+            // Similar to array version but with Span
+            int vectorSize = System.Numerics.Vector<float>.Count;
+            int length = a.Length;
+            int i = 0;
+            float sum = 0f;
+
+            if (length >= vectorSize * 4)
+            {
+                var acc1 = System.Numerics.Vector<float>.Zero; var acc2 = System.Numerics.Vector<float>.Zero;
+                var acc3 = System.Numerics.Vector<float>.Zero; var acc4 = System.Numerics.Vector<float>.Zero;
+                int end = length - (vectorSize * 4);
+
+                fixed (float* pA = a) fixed (float* pB = b)
+                {
+                    while (i <= end)
+                    {
+                        acc1 += *(System.Numerics.Vector<float>*)(pA + i) * *(System.Numerics.Vector<float>*)(pB + i);
+                        acc2 += *(System.Numerics.Vector<float>*)(pA + i + vectorSize) * *(System.Numerics.Vector<float>*)(pB + i + vectorSize);
+                        acc3 += *(System.Numerics.Vector<float>*)(pA + i + vectorSize * 2) * *(System.Numerics.Vector<float>*)(pB + i + vectorSize * 2);
+                        acc4 += *(System.Numerics.Vector<float>*)(pA + i + vectorSize * 3) * *(System.Numerics.Vector<float>*)(pB + i + vectorSize * 3);
+                        i += vectorSize * 4;
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(acc1 + acc2 + acc3 + acc4, System.Numerics.Vector<float>.One);
+            }
+            // Remainder loop ... for brevity, falling back to simple loop for remainder < 4 blocks
+            // Actually should implement properly for correctness
+
+            if (i <= length - vectorSize)
+            {
+                var acc = System.Numerics.Vector<float>.Zero;
+                fixed (float* pA = a) fixed (float* pB = b)
+                {
+                    while (i <= length - vectorSize)
+                    {
+                        acc += *(System.Numerics.Vector<float>*)(pA + i) * *(System.Numerics.Vector<float>*)(pB + i);
+                        i += vectorSize;
+                    }
+                }
+                sum += System.Numerics.Vector.Dot(acc, System.Numerics.Vector<float>.One);
+            }
+
+            for (; i < length; i++) sum += a[i] * b[i];
+            return sum;
+        }
+
         private static void ValidateInput(float[] a, float[] b)
         {
             if (a == null) throw new ArgumentNullException(nameof(a));

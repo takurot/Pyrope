@@ -1,0 +1,297 @@
+[31m    _________
+   /_||___||_\      [0mGarnet 1.0.91 64 bit; standalone mode[31m
+   '. \   / .'      [0mListening on: 127.0.0.1:4061 and 1 more[31m
+     '.\ /.'        [35mhttps://aka.ms/GetGarnet[31m
+       '.'
+[0m
+* Ready to accept connections
+info: Pyrope.GarnetServer.Services.PrefetchBackgroundQueue[0]
+      Prefetch background queue starting.
+info: Pyrope.GarnetServer.Services.PredictivePrefetcher[0]
+      Predictive Prefetching disabled (no endpoint).
+info: Pyrope.GarnetServer.Services.SidecarMetricsReporter[0]
+      Sidecar metrics reporting disabled (no endpoint configured).
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Volumes/Storage/src/Pyrope/src/Pyrope.GarnetServer
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/tenants - application/json;+charset=utf-8 36
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateTenant", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateTenant(Pyrope.GarnetServer.Controllers.CreateTenantRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing CreatedResult, writing value of type '<>f__AnonymousType16`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer) in 30.6462ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/tenants - 201 - application/json;+charset=utf-8 71.0562ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_baseline - application/json;+charset=utf-8 83
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_baseline - 404 0 - 2.3131ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[16]
+      Request reached the end of the middleware pipeline without being handled by application code. Request path: POST http://localhost:5000/v1/indexes/t1/idx_baseline, Response status code: 404
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/tenants - application/json;+charset=utf-8 36
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateTenant", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateTenant(Pyrope.GarnetServer.Controllers.CreateTenantRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing ConflictObjectResult, writing value of type 'System.String'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer) in 2.6117ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/tenants - 409 - text/plain;+charset=utf-8 6.6484ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - application/json;+charset=utf-8 20
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdateApiKey", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdateApiKey(System.String, Pyrope.GarnetServer.Controllers.UpdateTenantApiKeyRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType16`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer) in 2.3257ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - 200 - application/json;+charset=utf-8 11.7312ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes - application/json;+charset=utf-8 126
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateIndex(Pyrope.GarnetServer.Controllers.CreateIndexRequest) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing CreatedResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer) in 11.7629ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes - 201 - application/json;+charset=utf-8 12.8961ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - application/json;+charset=utf-8 43
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdatePolicies", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdatePolicies(Pyrope.GarnetServer.Model.CachePolicyConfig) on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type 'Pyrope.GarnetServer.Model.CachePolicyConfig'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer) in 2.6106ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - 200 - application/json;+charset=utf-8 3.6210ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/cache/flush - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "Flush", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Flush() on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType11`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer) in 1.3323ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/cache/flush - 200 - application/json;+charset=utf-8 2.5925ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_baseline/build - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "BuildIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult BuildIndex(System.String, System.String) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer) in 4607.6032ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_baseline/build - 200 - application/json;+charset=utf-8 4609.3541ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/tenants - application/json;+charset=utf-8 36
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateTenant", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateTenant(Pyrope.GarnetServer.Controllers.CreateTenantRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing ConflictObjectResult, writing value of type 'System.String'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer) in 1.2338ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/tenants - 409 - text/plain;+charset=utf-8 2.2105ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - application/json;+charset=utf-8 20
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdateApiKey", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdateApiKey(System.String, Pyrope.GarnetServer.Controllers.UpdateTenantApiKeyRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType16`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer) in 0.3691ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - 200 - application/json;+charset=utf-8 1.5438ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes - application/json;+charset=utf-8 127
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateIndex(Pyrope.GarnetServer.Controllers.CreateIndexRequest) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing CreatedResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer) in 0.9014ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes - 201 - application/json;+charset=utf-8 1.1390ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - application/json;+charset=utf-8 43
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdatePolicies", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdatePolicies(Pyrope.GarnetServer.Model.CachePolicyConfig) on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type 'Pyrope.GarnetServer.Model.CachePolicyConfig'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer) in 0.3447ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - 200 - application/json;+charset=utf-8 0.5512ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/cache/flush - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "Flush", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Flush() on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType11`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer) in 0.1112ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/cache/flush - 200 - application/json;+charset=utf-8 0.1841ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_ivf_tuned/build - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "BuildIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult BuildIndex(System.String, System.String) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer) in 3754.6813ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_ivf_tuned/build - 200 - application/json;+charset=utf-8 3756.0437ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/tenants - application/json;+charset=utf-8 36
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateTenant", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateTenant(Pyrope.GarnetServer.Controllers.CreateTenantRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing ConflictObjectResult, writing value of type 'System.String'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer) in 1.046ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.CreateTenant (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/tenants - 409 - text/plain;+charset=utf-8 2.2466ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - application/json;+charset=utf-8 20
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdateApiKey", controller = "Tenant"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdateApiKey(System.String, Pyrope.GarnetServer.Controllers.UpdateTenantApiKeyRequest) on controller Pyrope.GarnetServer.Controllers.TenantController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType16`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer) in 0.461ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.TenantController.UpdateApiKey (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/tenants/t1/apikey - 200 - application/json;+charset=utf-8 0.9368ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes - application/json;+charset=utf-8 154
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "CreateIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult CreateIndex(Pyrope.GarnetServer.Controllers.CreateIndexRequest) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing CreatedResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer) in 1.1617ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.CreateIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes - 201 - application/json;+charset=utf-8 1.3847ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - application/json;+charset=utf-8 43
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "UpdatePolicies", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult UpdatePolicies(Pyrope.GarnetServer.Model.CachePolicyConfig) on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type 'Pyrope.GarnetServer.Model.CachePolicyConfig'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer) in 0.2239ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.UpdatePolicies (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 PUT http://localhost:5000/v1/cache/policies - 200 - application/json;+charset=utf-8 0.3759ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/cache/flush - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "Flush", controller = "Cache"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Flush() on controller Pyrope.GarnetServer.Controllers.CacheController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType11`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer) in 0.1293ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.CacheController.Flush (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/cache/flush - 200 - application/json;+charset=utf-8 0.1985ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_hnsw/build - - 0
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[102]
+      Route matched with {action = "BuildIndex", controller = "Index"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult BuildIndex(System.String, System.String) on controller Pyrope.GarnetServer.Controllers.IndexController (Pyrope.GarnetServer).
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing OkObjectResult, writing value of type '<>f__AnonymousType14`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker[105]
+      Executed action Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer) in 14192.8891ms
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'Pyrope.GarnetServer.Controllers.IndexController.BuildIndex (Pyrope.GarnetServer)'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:5000/v1/indexes/t1/idx_hnsw/build - 200 - application/json;+charset=utf-8 14193.5994ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Pyrope.GarnetServer.Services.PrefetchBackgroundQueue[0]
+      Prefetch background queue stopping.

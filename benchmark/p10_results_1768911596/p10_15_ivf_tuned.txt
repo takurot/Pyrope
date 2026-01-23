@@ -1,0 +1,18 @@
+[Pyrope.Benchmarks] RESP endpoint: 127.0.0.1:4061
+[Pyrope.Benchmarks] tenant=t1 index=idx_ivf_tuned
+[Pyrope.Benchmarks] dataset=synthetic payload=binary(float32)
+[Pyrope.Benchmarks] Loading base vectors: 10000 ...
+[Pyrope.Benchmarks] Loading: 2609/10000 (26.1%) - 2608.0 vec/s[Pyrope.Benchmarks] Loading: 2608/10000 (26.1%) - 2607.1 vec/s[Pyrope.Benchmarks] Loading: 2612/10000 (26.1%) - 2611.0 vec/s[Pyrope.Benchmarks] Loading: 2606/10000 (26.1%) - 2605.2 vec/s[Pyrope.Benchmarks] Loading: 2607/10000 (26.1%) - 2606.1 vec/s[Pyrope.Benchmarks] Loading: 2610/10000 (26.1%) - 2609.0 vec/s[Pyrope.Benchmarks] Loading: 2613/10000 (26.1%) - 2612.0 vec/s[Pyrope.Benchmarks] Loading: 2611/10000 (26.1%) - 2610.0 vec/s[Pyrope.Benchmarks] Loading: 10000/10000 (100.0%) - 30348.7 vec/s
+[Pyrope.Benchmarks] Loaded=10000 elapsed=1.33s throughput=7518.8 vec/s
+[Pyrope.Benchmarks] Loaded=10000 elapsed=1.33s throughput=7518.8 vec/s
+
+[Pyrope.Benchmarks] Triggering Index Build (Compaction)...
+[Pyrope.Benchmarks] Build triggered.
+
+[Pyrope.Benchmarks] Warmup: 100 queries ...
+
+[Pyrope.Benchmarks] Benchmark: queries=100 topK=10 concurrency=8 ...
+[Pyrope.Benchmarks] Searching: 100/100 (100.0%) - 1095.2 QPS
+[Pyrope.Benchmarks] Dimension=128
+[Pyrope.Benchmarks] Total=100 elapsed=0.09s QPS=1092.0
+[Pyrope.Benchmarks] Latency(ms): min=0.897 p50=6.675 p95=15.461 p99=17.375 max=17.4 mean=7.092

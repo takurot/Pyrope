@@ -93,6 +93,13 @@ namespace Pyrope.GarnetServer.Services
                     int efSearch = GetIntParam(config, "ef_search", 10);
                     tail = new HnswVectorIndex(dimension, metric, m, efConstruction, efSearch);
                 }
+                else if (algo == "IVF_PQ")
+                {
+                    int m = GetIntParam(config, "m", 4);
+                    int k = GetIntParam(config, "k", 256);
+                    int nList = GetIntParam(config, "nlist", 100);
+                    tail = new IvfPqVectorIndex(dimension, metric, m, k, nList);
+                }
                 else
                 {
                     // IVF_FLAT

@@ -116,7 +116,7 @@ namespace Pyrope.GarnetServer.Vector
                 int k = Math.Min(NList, uniqueData.Count);
                 if (k <= 0) k = 1;
 
-                var centroids = TrainKMeans(allVectors, k);
+                var centroids = KMeansUtils.Train(allVectors, k, Dimension, Metric, seed: 42);
 
                 // Precompile centroid norms for faster assignment/search if needed
                 var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(c) : 0f).ToList();
@@ -127,7 +127,7 @@ namespace Pyrope.GarnetServer.Vector
 
                 foreach (var item in uniqueData)
                 {
-                    int bestC = FindNearestCentroid(item.Value.Vector, centroids, cNorms);
+                    int bestC = KMeansUtils.FindNearestCentroid(item.Value.Vector, centroids, cNorms, Metric);
                     newLists[bestC].Add(item);
                 }
 
@@ -314,95 +314,7 @@ namespace Pyrope.GarnetServer.Vector
 
         // --- Internals ---
 
-        private List<float[]> TrainKMeans(List<float[]> data, int k)
-        {
-            var rnd = new Random(42);
-            var centroids = data.OrderBy(_ => rnd.Next()).Take(k).Select(x => (float[])x.Clone()).ToList();
 
-            if (centroids.Count < k)
-            {
-                // Edge case: fewer data points than k
-                // Just keep what we have
-            }
-
-            int maxIter = 10;
-            // Precompute L2 norms needed? 
-            // Standard KMeans uses Euclidean distance (L2) regardless of target metric usually, 
-            // but for Cosine similarity search, Spherical K-Means is better.
-            // For MVP, we stick to standard KMeans (L2 minimizes variance).
-
-            for (int iter = 0; iter < maxIter; iter++)
-            {
-                var clusters = new List<float[]>[k];
-                for (int i = 0; i < k; i++) clusters[i] = new List<float[]>();
-
-                bool changed = false;
-
-                // Temp norms for centroids during training iteration
-                var cNorms = centroids.Select(c => Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(c) : 0f).ToList();
-
-                // Assign
-                foreach (var vec in data)
-                {
-                    int best = FindNearestCentroid(vec, centroids, cNorms);
-                    clusters[best].Add(vec);
-                }
-
-                // Update
-                for (int i = 0; i < k; i++)
-                {
-                    if (clusters[i].Count == 0) continue;
-
-                    var newC = new float[Dimension];
-                    foreach (var vec in clusters[i])
-                    {
-                        for (int d = 0; d < Dimension; d++) newC[d] += vec[d];
-                    }
-                    for (int d = 0; d < Dimension; d++) newC[d] /= clusters[i].Count;
-
-                    if (!ArraysEqual(centroids[i], newC))
-                    {
-                        centroids[i] = newC;
-                        changed = true;
-                    }
-                }
-
-                if (!changed) break;
-            }
-            return centroids;
-        }
-
-        private bool ArraysEqual(float[] a, float[] b)
-        {
-            if (a.Length != b.Length) return false;
-            for (int i = 0; i < a.Length; i++)
-                if (Math.Abs(a[i] - b[i]) > 1e-6) return false;
-            return true;
-        }
-
-        private int FindNearestCentroid(float[] vec, List<float[]> centroids, List<float> centroidNorms)
-        {
-            int bestIndex = 0;
-            // Fix: Initialize bestDist correctly based on metric
-            // ComputeScore returns a score where Higher is Better.
-            // So we start with MinValue.
-            float bestScore = float.MinValue;
-
-            float vecNorm = Metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(vec) : 0f;
-
-            for (int i = 0; i < centroids.Count; i++)
-            {
-                // Fix: Pass centroid norm
-                float score = ComputeScore(vec, new VectorEntry(centroids[i], centroidNorms[i]), vecNorm);
-
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestIndex = i;
-                }
-            }
-            return bestIndex;
-        }
 
         // Helpers
         private void ValidateVector(float[] vector)
