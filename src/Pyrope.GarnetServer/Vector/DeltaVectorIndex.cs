@@ -127,9 +127,20 @@ namespace Pyrope.GarnetServer.Vector
             try
             {
                 // Compact: Move items from Head -> Tail
+                // Compact: Move items from Head -> Tail
+                IEnumerable<KeyValuePair<string, float[]>> items = null;
+
                 if (_head is BruteForceVectorIndex bfHead)
                 {
-                    var items = bfHead.Scan();
+                    items = bfHead.Scan();
+                }
+                else if (_head is HnswVectorIndex hnswHead)
+                {
+                    items = hnswHead.Scan();
+                }
+
+                if (items != null)
+                {
                     foreach (var kvp in items)
                     {
                         _tail.Add(kvp.Key, kvp.Value);

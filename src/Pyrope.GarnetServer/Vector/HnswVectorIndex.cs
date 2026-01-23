@@ -39,18 +39,48 @@ namespace Pyrope.GarnetServer.Vector
             _levelLambda = 1.0 / Math.Log(m);
         }
 
+        public IEnumerable<KeyValuePair<string, float[]>> Scan()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                var result = new List<KeyValuePair<string, float[]>>(_nodes.Count);
+                for(int i = 0; i < _nodes.Count; i++)
+                {
+                   if(!_nodes[i].IsDeleted)
+                   {
+                       var vec = GetVectorSpan(i).ToArray(); // Clone for export
+                       result.Add(new KeyValuePair<string, float[]>(_nodes[i].ExternalId, vec));
+                   }
+                }
+                return result;
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
         public void Add(string id, float[] vector)
         {
             if (vector == null) throw new ArgumentNullException(nameof(vector));
             if (vector.Length != Dimension) throw new ArgumentException("Dimension mismatch");
 
             // Normalize if Cosine to ensure correctness
+            // Copy to avoid modifying caller's array
+            float[] vectorToAdd = vector;
             if (Metric == VectorMetric.Cosine)
             {
                 float norm = VectorMath.ComputeNorm(vector);
-                if (norm > 1e-6f)
+                if (norm > 1e-6f && Math.Abs(norm - 1.0f) > 1e-4f)
                 {
-                    for (int i = 0; i < vector.Length; i++) vector[i] /= norm;
+                    vectorToAdd = new float[Dimension];
+                    for (int i = 0; i < Dimension; i++) vectorToAdd[i] = vector[i] / norm;
+                }
+                else if (Math.Abs(norm - 1.0f) <= 1e-4f)
+                {
+                     // Already close to 1, just use it
+                     vectorToAdd = vector;
                 }
             }
 
@@ -69,7 +99,7 @@ namespace Pyrope.GarnetServer.Vector
                 // Add split: Node (structure) + Vector (data)
                 var newNode = new Node(id, level, M); // Vector removed from Node
                 _nodes.Add(newNode);
-                _flatVectors.AddRange(vector); // Append flat
+                _flatVectors.AddRange(vectorToAdd); // Append flat
 
                 _idMap[id] = newNodeId;
 
