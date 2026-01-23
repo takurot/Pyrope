@@ -438,8 +438,8 @@ public static class Program
             var putRes = await http.PutAsync($"v1/tenants/{tenantId}/apikey", put);
             if (!putRes.IsSuccessStatusCode)
             {
-                 var err = await putRes.Content.ReadAsStringAsync();
-                 Console.Error.WriteLine($"[Error] EnsureTenantAsync (Put): {putRes.StatusCode} - {err}");
+                var err = await putRes.Content.ReadAsStringAsync();
+                Console.Error.WriteLine($"[Error] EnsureTenantAsync (Put): {putRes.StatusCode} - {err}");
             }
             putRes.EnsureSuccessStatusCode();
             return;
@@ -447,8 +447,8 @@ public static class Program
 
         if (!res.IsSuccessStatusCode)
         {
-             var err = await res.Content.ReadAsStringAsync();
-             Console.Error.WriteLine($"[Error] EnsureTenantAsync (Post): {res.StatusCode} - {err}");
+            var err = await res.Content.ReadAsStringAsync();
+            Console.Error.WriteLine($"[Error] EnsureTenantAsync (Post): {res.StatusCode} - {err}");
         }
         res.EnsureSuccessStatusCode();
     }
@@ -461,16 +461,16 @@ public static class Program
 
         // Check if exists? Or just Create with ignore if exists?
         // API CreateIndex returns 200/201 on success.
-        
+
         var parameters = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(options.Parameters))
         {
-             // naive parsing: key=value,key2=value2
-             foreach(var p in options.Parameters.Split(','))
-             {
-                 var kv = p.Split('=');
-                 if(kv.Length == 2) parameters[kv[0].Trim()] = kv[1].Trim();
-             }
+            // naive parsing: key=value,key2=value2
+            foreach (var p in options.Parameters.Split(','))
+            {
+                var kv = p.Split('=');
+                if (kv.Length == 2) parameters[kv[0].Trim()] = kv[1].Trim();
+            }
         }
 
         var req = new
@@ -492,8 +492,8 @@ public static class Program
         if (res.StatusCode == System.Net.HttpStatusCode.Conflict) return;
         if (!res.IsSuccessStatusCode)
         {
-             var err = await res.Content.ReadAsStringAsync();
-             Console.Error.WriteLine($"[Error] EnsureIndexAsync: {res.StatusCode} - {err}");
+            var err = await res.Content.ReadAsStringAsync();
+            Console.Error.WriteLine($"[Error] EnsureIndexAsync: {res.StatusCode} - {err}");
         }
         res.EnsureSuccessStatusCode();
     }

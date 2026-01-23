@@ -44,8 +44,8 @@ namespace Pyrope.GarnetServer.Controllers
             try
             {
                 var metric = Enum.Parse<VectorMetric>(request.Metric, true);
-                
-                var config = new IndexConfig 
+
+                var config = new IndexConfig
                 {
                     Dimension = request.Dimension,
                     Metric = request.Metric,

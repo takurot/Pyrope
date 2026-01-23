@@ -82,7 +82,7 @@ namespace Pyrope.GarnetServer.Services
             {
                 Dimension = dimension;
                 Metric = metric;
-                
+
                 IVectorIndex tail;
                 string algo = config?.Algorithm?.ToUpperInvariant() ?? "IVF_FLAT"; // Default to IVF_FLAT if not specified to maintain backward compat for now
 
@@ -109,11 +109,11 @@ namespace Pyrope.GarnetServer.Services
             {
                 if (config != null && config.Parameters != null && config.Parameters.TryGetValue(key, out var obj))
                 {
-                     if (obj is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.Number)
-                         return je.GetInt32();
-                     if (obj is int val) return val;
-                     if (obj is long lVal) return (int)lVal;
-                     if (obj is string sVal && int.TryParse(sVal, out int parsed)) return parsed;
+                    if (obj is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.Number)
+                        return je.GetInt32();
+                    if (obj is int val) return val;
+                    if (obj is long lVal) return (int)lVal;
+                    if (obj is string sVal && int.TryParse(sVal, out int parsed)) return parsed;
                 }
                 return defaultValue;
             }

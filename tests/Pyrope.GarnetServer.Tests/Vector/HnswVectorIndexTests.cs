@@ -15,7 +15,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
             index.Add("1", vec);
 
             var results = index.Search(vec, 1);
-            
+
             Assert.Single(results);
             Assert.Equal("1", results[0].Id);
             Assert.Equal(0.0f, results[0].Score, 5); // L2 distance should be 0 for exact match
@@ -42,7 +42,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
         {
             var index = new HnswVectorIndex(2, VectorMetric.L2);
             index.Add("1", new float[] { 1.0f, 0.0f });
-            
+
             // Search should find it
             var initial = index.Search(new float[] { 1.0f, 0.0f }, 1);
             Assert.Equal("1", initial[0].Id);
@@ -91,7 +91,7 @@ namespace Pyrope.GarnetServer.Tests.Vector
         public void Cosine_NormalizesInputAutomatically()
         {
             var index = new HnswVectorIndex(2, VectorMetric.Cosine);
-            
+
             // Add unnormalized vector {10, 0} -> Should become {1, 0}
             index.Add("1", new float[] { 10.0f, 0.0f });
 
@@ -104,8 +104,8 @@ namespace Pyrope.GarnetServer.Tests.Vector
             // Search with unnormalized vector {5, 0} -> Should become {1, 0}
             // Dot product {1,0}*{1,0}=1. Distance = 1-1=0. Score = 1-0=1.
             var res2 = index.Search(new float[] { 5.0f, 0.0f }, 1);
-             Assert.Equal("1", res2[0].Id);
-            Assert.Equal(1.0f, res2[0].Score, 5); 
+            Assert.Equal("1", res2[0].Id);
+            Assert.Equal(1.0f, res2[0].Score, 5);
         }
 
         [Fact]
