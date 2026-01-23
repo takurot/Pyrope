@@ -20,9 +20,10 @@ Pyrope uses a robust, layered architecture:
     *   Handles RESP-compatible commands.
     *   Manages Result, Candidate, and Meta caches.
     *   Executes lightweight "Hot Path" policy decisions (< 0.1ms).
-2.  **ANN Engine (FAISS)**:
-    *   Performs core vector indexing and searching.
-    *   Supports dynamic "Delta Indexing" (Head + Tail strategy) for real-time updates.
+2.  **Vector Engine (Native C#)**:
+    *   **HNSW**: High-performance graph index (SIMD-accelerated) for low-latency search.
+    *   **IVF-PQ**: Product Quantization for high-scale, memory-efficient indexing.
+    *   **Delta Indexing**: Real-time updates via Head (HNSW/Flat) + Tail (IVF-PQ/Flat) generic architecture.
 3.  **AI Cache Controller**:
     *   **Warm Path (Sidecar)**: Runs complex inference (Python/ONNX) to update caching policies and scoring models asynchronously (10-50ms).
     *   Learns and evolves caching strategies continuously based on query logs.
@@ -60,89 +61,59 @@ VEC.SEARCH my_app main_idx TOPK 10 VECTOR \x00\x01...
 VEC.ADD my_app main_idx "doc1" VECTOR \x00\x01... META {"category":"news"}
 ```
 
-## 📈 Benchmarking (P1-6)
+## 📈 Benchmarking (P1-10)
 
-Pyrope includes a simple benchmarking tool to load common datasets and measure baseline search latency/QPS.
+Pyrope includes a benchmarking tool to load common datasets and measure latency/QPS/Recall.
 
-### Start server (RESP)
-
-**重要**: ベンチマークでHTTP API経由のテナント自動登録を使用する場合は、`PYROPE_ADMIN_API_KEY`環境変数を設定してサーバーを起動してください。
-
+### Start server
 ```bash
-# Admin API Keyを設定してサーバーを起動
+# Set Admin Key and start server
 PYROPE_ADMIN_API_KEY=your_admin_key dotnet run --project src/Pyrope.GarnetServer -- --port 3278 --bind 127.0.0.1
 ```
 
-### Run benchmark (Synthetic data - クイックテスト)
+### Run benchmark (Quick Start)
 
-合成データを使用した簡単なテスト（データセットのダウンロード不要）:
-
+**Baseline (IVF-Flat)**:
 ```bash
 ./scripts/bench_vectors.sh \
   --dataset synthetic \
-  --dim 128 \
-  --base-limit 1000 \
-  --query-limit 100 \
-  --topk 10 \
-  --concurrency 4 \
-  --api-key your_tenant_key \
-  --http http://localhost:5000 \
-  --admin-api-key your_admin_key
+  --dim 128 --base-limit 10000 --query-limit 100 \
+  --algorithm IVF_FLAT --params nlist=100 \
+  --api-key tenant1 --http http://localhost:5000 --admin-api-key your_admin_key --build-index
 ```
 
-### Run benchmark (SIFT1M fvecs)
-
-Prepare a directory containing `sift_base.fvecs` and `sift_query.fvecs`, then run:
-
+**High Performance (HNSW)**:
 ```bash
 ./scripts/bench_vectors.sh \
-  --dataset sift \
-  --sift-dir ./datasets/sift1m \
-  --base-limit 100000 \
-  --query-limit 1000 \
-  --topk 10 \
-  --concurrency 16 \
-  --warmup 100 \
-  --api-key your_tenant_key \
-  --http http://localhost:5000 \
-  --admin-api-key your_admin_key
+  --dataset synthetic \
+  --dim 128 --base-limit 10000 --query-limit 100 \
+  --algorithm HNSW --params m=16,ef_construction=200,ef_search=50 \
+  --api-key tenant1 --http http://localhost:5000 --admin-api-key your_admin_key --build-index
 ```
 
-### Run benchmark (GloVe txt)
-
+**Memory Efficient (IVF-PQ)**:
 ```bash
 ./scripts/bench_vectors.sh \
-  --dataset glove \
-  --glove-path ./datasets/glove/glove.6B.100d.txt \
-  --dim 100 \
-  --base-limit 200000 \
-  --query-limit 2000 \
-  --api-key your_tenant_key \
-  --http http://localhost:5000 \
-  --admin-api-key your_admin_key
+  --dataset synthetic \
+  --dim 128 --base-limit 10000 --query-limit 100 \
+  --algorithm IVF_PQ --params "nlist=100,m=4,k=256" \
+  --api-key tenant1 --http http://localhost:5000 --admin-api-key your_admin_key --build-index
 ```
 
 ### Benchmark Options
-
-| オプション | 説明 |
+| Option | Description |
 | --- | --- |
-| `--api-key` | (必須) テナントAPIキー。VEC.*コマンドの認証に使用 |
-| `--http` | HTTP APIのベースURL (例: `http://localhost:5000`)。指定するとテナントを自動作成 |
-| `--admin-api-key` | `--http`使用時に必須。Admin APIキー |
-| `--dataset` | `synthetic`, `sift`, `glove` のいずれか |
-| `--dim` | ベクトル次元数 (synthetic/glove で必須) |
-| `--base-limit` | ロードするベースベクトル数 |
-| `--query-limit` | 実行するクエリ数 |
-| `--topk` | 検索で返す上位K件 |
-| `--concurrency` | 並列ワーカー数 |
+| `--algorithm` | `HNSW`, `IVF_PQ`, `IVF_FLAT`, `FLAT` |
+| `--params` | Algorithm params (e.g. `nlist=1024`, `m=16`, `ef_search=50`) |
 
 ## 📊 Comparison
 
 | Feature | Pyrope | Pinecone | Milvus | Weaviate |
 | :--- | :--- | :--- | :--- | :--- |
+| **Search Engine** | **Native C# (HNSW/PQ)** | Proprietary | FAISS/HNSW | HNSW |
 | **AI Cache Control** | ✅ Unique | ❌ | ❌ | ❌ |
 | **Semantic Cache** | ✅ Cost-Aware | ❌ | ❌ | ❌ |
-| **SLO Guardrails** | ✅ Pro | ❌ | ❌ | 部分 |
+| **SLO Guardrails** | ✅ Pro | ❌ | ❌ | Partial |
 | **Query Prediction** | ✅ | ❌ | ❌ | ❌ |
 
 ## 📄 License
