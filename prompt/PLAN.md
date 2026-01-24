@@ -162,6 +162,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P9-5** | [Security] | **SSO/OIDC Integration**<br>Enterprise authentication via OIDC providers. | P5-5 | [ ] |
 | **P9-6** | [ML] | **Per-Tenant Models**<br>Train and deploy tenant-specific admission/TTL models. | P8-5 | [ ] |
 | **P9-7** | [Ops] | **Runbook Automation**<br>Implement automated P99 recovery actions: CACHE_HINT=force, param degradation, admission tightening. | P5-4, P9-3 | [ ] |
+| **P9-8** | [Ops] | **Benchmark Stability & HNSW Outlier Investigation**<br>Reproduce intermittent HNSW p99 spikes with larger query counts, add tooling to log tail latencies, and identify root cause (GC/lock contention/thread pool). | P1-6 | [ ] |
+| **P9-9** | [Ops] | **Index Build Timeout Handling**<br>Fix HTTP build endpoint timeouts for large datasets (server-side async build or client timeout config); document recommended flags for HNSW benchmarks. | P3-1 | [ ] |
 
 ---
 

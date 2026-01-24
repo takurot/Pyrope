@@ -8,6 +8,7 @@ using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
 using Pyrope.GarnetServer.Services;
 using Pyrope.GarnetServer.DataModel;
+using Pyrope.GarnetServer.Extensions;
 
 namespace Pyrope.GarnetServer
 {
@@ -108,6 +109,9 @@ namespace Pyrope.GarnetServer
             // --- RBAC (P5-6) ---
             builder.Services.AddSingleton<TenantUserRegistry>();
             builder.Services.AddSingleton<IAuthorizationService, RbacAuthorizationService>();
+
+            // --- Sidecar Client (P8-4) ---
+            builder.Services.AddSidecarClient(builder.Configuration);
 
             // --- Audit Logging (P5-7) ---
             builder.Services.AddSingleton<IAuditLogger>(sp =>

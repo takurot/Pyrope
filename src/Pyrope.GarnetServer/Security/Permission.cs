@@ -32,7 +32,10 @@ namespace Pyrope.GarnetServer.Security
         AuditRead,
 
         // Billing operations
-        BillingRead
+        BillingRead,
+
+        // System operations (Admin only)
+        SystemManage
     }
 
     /// <summary>

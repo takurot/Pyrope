@@ -39,7 +39,7 @@ namespace Pyrope.GarnetServer.Tests.Services
                 policyEngine,
                 configuration,
                 NullLogger<SidecarMetricsReporter>.Instance,
-                slowClient);
+                new MockServiceProvider(slowClient));
 
             await reporter.StartAsync(CancellationToken.None);
 
@@ -116,6 +116,14 @@ namespace Pyrope.GarnetServer.Tests.Services
                 await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
                 return new SystemMetricsResponse { Status = "OK" };
             }
+        }
+
+
+        private sealed class MockServiceProvider : IServiceProvider
+        {
+            private readonly object _service;
+            public MockServiceProvider(object service) => _service = service;
+            public object? GetService(Type serviceType) => _service;
         }
     }
 }

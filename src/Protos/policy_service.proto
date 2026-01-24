@@ -39,6 +39,13 @@ service PolicyService {
   // Predictive Prefetching
   rpc ReportClusterAccess (ReportClusterAccessRequest) returns (ReportClusterAccessResponse);
   rpc GetPrefetchRules (GetPrefetchRulesRequest) returns (GetPrefetchRulesResponse);
+
+  // AI Model Management (P8-4)
+  rpc ListModels (Empty) returns (ModelList);
+  rpc TrainModel (TrainRequest) returns (TrainResponse);
+  rpc DeployModel (DeployRequest) returns (DeployResponse);
+  rpc RollbackModel (RollbackRequest) returns (RollbackResponse);
+  rpc GetEvaluations (Empty) returns (EvaluationMetrics);
 }
 
 
@@ -77,4 +84,55 @@ message WarmPathPolicy {
   double admission_threshold = 1;
   int32 ttl_seconds = 2;
   int32 eviction_priority = 3;
+}
+
+// AI Model Management Messages
+message Empty {}
+
+message ModelInfo {
+  string version = 1;
+  string created_at = 2;
+  string status = 3; // "trained", "active", "canary"
+  double evaluation_score = 4;
+}
+
+message ModelList {
+  repeated ModelInfo models = 1;
+  string active_model_version = 2;
+  string canary_model_version = 3;
+}
+
+message TrainRequest {
+  string dataset_path = 1; // Optional override
+}
+
+message TrainResponse {
+  string status = 1;
+  string job_id = 2;
+}
+
+message DeployRequest {
+  string version = 1;
+  bool canary = 2;
+  repeated string canary_tenants = 3; // Tenants to route to canary model
+}
+
+message DeployResponse {
+  string status = 1;
+  string version = 2;
+}
+
+message RollbackRequest {
+    bool canary_only = 1;
+}
+
+message RollbackResponse {
+    string status = 1;
+    string active_version = 2;
+}
+
+message EvaluationMetrics {
+    double current_p99_improvement = 1;
+    double current_cache_hit_rate = 2;
+    map<string, double> other_metrics = 3;
 }
