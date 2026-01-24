@@ -138,8 +138,10 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             # print("BANDIT: Applied Aggressive override")
 
         # Fake Reward Calculation (minimize miss rate)
-        # Reward = 1 - miss_rate (higher is better)
-        reward = 1.0 - request.miss_rate
+        # Positive reward for low miss rate; negative for high miss rate.
+        baseline = 0.3
+        reward = baseline - request.miss_rate
+        reward = max(-1.0, min(1.0, reward))
         self._bandit_engine.update(bandit_features, action, reward)
 
         print(

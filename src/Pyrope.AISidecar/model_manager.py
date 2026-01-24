@@ -99,26 +99,29 @@ class ModelManager:
 
     def deploy_model(self, version: str, canary: bool = False, tenants: List[str] = None) -> str:
         with self.lock:
-            src_path = os.path.join(self.staging_dir, f"{version}.onnx")
-            if not os.path.exists(src_path):
-                raise ValueError(f"Model version {version} not found")
+            return self._deploy_model_locked(version, canary=canary, tenants=tenants)
 
-            if canary:
-                shutil.copy2(src_path, self.canary_model_path)
-                self.canary_version = version
-                self.canary_tenants = set(tenants) if tenants else set()
-                logger.info(f"Deployed {version} as CANARY for tenants: {self.canary_tenants}")
-            else:
-                shutil.copy2(src_path, self.active_model_path)
-                self.active_version = version
-                # If promoting canary to active, maybe clear canary?
-                if self.canary_version == version:
-                    self.canary_version = None
-                    self.canary_tenants = set()
-                logger.info(f"Deployed {version} as ACTIVE")
-            
-            self._save_state()
-            return "OK"
+    def _deploy_model_locked(self, version: str, canary: bool, tenants: Optional[List[str]]) -> str:
+        src_path = os.path.join(self.staging_dir, f"{version}.onnx")
+        if not os.path.exists(src_path):
+            raise ValueError(f"Model version {version} not found")
+
+        if canary:
+            shutil.copy2(src_path, self.canary_model_path)
+            self.canary_version = version
+            self.canary_tenants = set(tenants) if tenants else set()
+            logger.info(f"Deployed {version} as CANARY for tenants: {self.canary_tenants}")
+        else:
+            shutil.copy2(src_path, self.active_model_path)
+            self.active_version = version
+            # If promoting canary to active, maybe clear canary?
+            if self.canary_version == version:
+                self.canary_version = None
+                self.canary_tenants = set()
+            logger.info(f"Deployed {version} as ACTIVE")
+
+        self._save_state()
+        return "OK"
 
     def rollback_model(self, canary_only: bool = False) -> str:
         with self.lock:
@@ -129,33 +132,30 @@ class ModelManager:
                     self.canary_tenants = set()
                     if os.path.exists(self.canary_model_path):
                         os.remove(self.canary_model_path)
-                else:
-                    return "No canary to rollback"
-            else:
-                # Rollback active model... to what? 
-                # Ideally we track history. For now, let's just say we can't easily rollback active without a version
-                # Or we scan for the previous version.
-                models = self._scan_models()
-                if not models:
-                    return "No models found"
-                
-                # Find current active index
-                current_idx = -1
-                for i, m in enumerate(models):
-                    if m["version"] == self.active_version:
-                        current_idx = i
-                        break
-                
-                if current_idx != -1 and current_idx + 1 < len(models):
-                    prev_version = models[current_idx + 1]["version"]
-                    logger.info(f"Rolling back active from {self.active_version} to {prev_version}")
-                    self.deploy_model(prev_version, canary=False)
-                    return f"Rolled back to {prev_version}"
-                else:
-                    return "No previous version found to rollback to"
+                    self._save_state()
+                    return "OK"
+                return "No canary to rollback"
 
-            self._save_state()
-            return "OK"
+            # Rollback active model... to what? 
+            # Ideally we track history. For now, let's just say we can't easily rollback active without a version
+            # Or we scan for the previous version.
+            models = self._scan_models()
+            if not models:
+                return "No models found"
+
+            # Find current active index
+            current_idx = -1
+            for i, m in enumerate(models):
+                if m["version"] == self.active_version:
+                    current_idx = i
+                    break
+
+            if current_idx != -1 and current_idx + 1 < len(models):
+                prev_version = models[current_idx + 1]["version"]
+                logger.info(f"Rolling back active from {self.active_version} to {prev_version}")
+                self._deploy_model_locked(prev_version, canary=False, tenants=None)
+                return f"Rolled back to {prev_version}"
+            return "No previous version found to rollback to"
 
     def _save_state(self):
         state = {
