@@ -4,13 +4,11 @@ import json
 import shutil
 import logging
 import threading
-import time
 from datetime import datetime
 from typing import List, Optional, Dict
 
-from train_model import main as train_script
-
 logger = logging.getLogger(__name__)
+
 
 class ModelManager:
     def __init__(self, models_dir="models", staging_dir="models/staging", active_model_path="models/active.onnx", canary_model_path="models/canary.onnx"):
@@ -38,7 +36,7 @@ class ModelManager:
             stat = os.stat(f)
             version = os.path.basename(f).replace(".onnx", "")
             created_at = datetime.fromtimestamp(stat.st_mtime).isoformat()
-            
+
             status = "trained"
             if self.active_version == version:
                 status = "active"
@@ -49,9 +47,9 @@ class ModelManager:
                 "version": version,
                 "created_at": created_at,
                 "status": status,
-                "evaluation_score": 0.0 # TODO: Store evaluations in a sidecar file
+                "evaluation_score": 0.0  # TODO: Store evaluations in a sidecar file
             })
-        
+
         # Sort by creation time desc
         models.sort(key=lambda x: x["created_at"], reverse=True)
         return models
@@ -68,12 +66,12 @@ class ModelManager:
         """Triggers training and returns a job ID (version)."""
         version = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = os.path.join(self.staging_dir, f"{version}.onnx")
-        
+
         # Run training in a separate thread to avoid blocking API
         # In a real system, this should be a proper job queue
         thread = threading.Thread(target=self._run_training, args=(dataset_path, output_path, version))
         thread.start()
-        
+
         return version
 
     def _run_training(self, dataset_path, output_path, version):
@@ -83,16 +81,16 @@ class ModelManager:
             # Hack: modify sys.argv if needed or refactor train_model to accept args
             # We will refactor train_model.py to be importable
             import train_model
-            
+
             # Create a dummy args object or call a function directly
             log_path = dataset_path if dataset_path else "logs/query_log.jsonl"
-            
+
             logger.info(f"Training on {log_path} -> {output_path}")
-            
+
             logs = train_model.load_logs(log_path)
             df = train_model.extract_features_and_labels(logs)
             train_model.train_and_export(df, output_path)
-            
+
             logger.info(f"Training completed for {version}")
         except Exception as e:
             logger.error(f"Training failed for {version}: {e}")
@@ -136,7 +134,7 @@ class ModelManager:
                     return "OK"
                 return "No canary to rollback"
 
-            # Rollback active model... to what? 
+            # Rollback active model... to what?
             # Ideally we track history. For now, let's just say we can't easily rollback active without a version
             # Or we scan for the previous version.
             models = self._scan_models()

@@ -8,7 +8,6 @@ import warnings
 from concurrent import futures
 
 import grpc
-from google.protobuf.json_format import MessageToDict
 
 # These imports will work after running codegen.py
 try:
@@ -53,7 +52,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         self._latest_system_features = None
         self._llm_worker = LLMWorker()  # Initialize LLM Worker
         self._event_loop = None  # Will be set when async loop starts
-        
+
         self._model_manager = ModelManager()
         self._bandit_engine = ContextualBanditEngine()
 
@@ -92,7 +91,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         if request.tenant_id in self._model_manager.canary_tenants:
             print(f"Tenant {request.tenant_id} routed to CANARY model {self._model_manager.canary_version}")
             # TODO: Load params from canary model config if available
-        
+
         return policy_service_pb2.IndexPolicyResponse(pq_m=16, pq_construction=200, pca_dimension=64, status="OK")
 
     def ReportSystemMetrics(self, request, context):
@@ -100,15 +99,15 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
         # P8-6: Online Learning Loop
         # 1. Update Bandit with previous reward (Change in miss rate?)
-        # For simplicity, we just assume improvement is reward. 
+        # For simplicity, we just assume improvement is reward.
         # But we need state from PREVIOUS step.
         # Here we just use current state to predict Action.
-        
+
         bandit_features = self._bandit_engine.get_features(request)
         action = self._bandit_engine.select_action(bandit_features)
-        
+
         # Action 0: Normal (Heuristic/LLM), Action 1: Aggressive Override
-        
+
         policy_config = None
 
         # P6-13: Use LLM or heuristic based on feature flag
@@ -226,7 +225,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
     def GetEvaluations(self, request, context):
         return policy_service_pb2.EvaluationMetrics(
-            current_p99_improvement=0.25, # Placeholder from evaluate_model.py logic
+            current_p99_improvement=0.25,  # Placeholder from evaluate_model.py logic
             current_cache_hit_rate=0.85,
             other_metrics={"bandit_epsilon": self._bandit_engine.epsilon}
         )
