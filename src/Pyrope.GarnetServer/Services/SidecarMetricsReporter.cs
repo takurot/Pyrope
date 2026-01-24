@@ -40,7 +40,7 @@ namespace Pyrope.GarnetServer.Services
             _systemUsageProvider = systemUsageProvider;
             _policyEngine = policyEngine;
             _logger = logger;
-            
+
             // Resolve optional client
             _policyClient = serviceProvider.GetService<PolicyService.PolicyServiceClient>();
 

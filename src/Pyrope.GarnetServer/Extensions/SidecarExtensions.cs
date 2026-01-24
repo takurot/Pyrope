@@ -16,7 +16,7 @@ namespace Pyrope.GarnetServer.Extensions
         public static IServiceCollection AddSidecarClient(this IServiceCollection services, IConfiguration configuration)
         {
             var endpoint = configuration["Sidecar:Endpoint"] ?? Environment.GetEnvironmentVariable("PYROPE_SIDECAR_ENDPOINT");
-            
+
             if (string.IsNullOrWhiteSpace(endpoint))
             {
                 // Register a null client or handle gracefully? 
@@ -42,7 +42,7 @@ namespace Pyrope.GarnetServer.Extensions
             services.AddSingleton<PolicyService.PolicyServiceClient>(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<PolicyService.PolicyServiceClient>>();
-                
+
                 var uri = new Uri(endpoint);
                 if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
                 {
@@ -79,7 +79,7 @@ namespace Pyrope.GarnetServer.Extensions
                         {
                             if (caCert == null) return sslPolicyErrors == SslPolicyErrors.None;
                             if (certificate == null) return false;
-                            
+
                             if (skipServerNameValidation)
                             {
                                 sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;

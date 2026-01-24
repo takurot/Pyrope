@@ -116,8 +116,8 @@ namespace Pyrope.GarnetServer.Tests.Services
                 await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
                 return new SystemMetricsResponse { Status = "OK" };
             }
-            }
-    
+        }
+
 
         private sealed class MockServiceProvider : IServiceProvider
         {
