@@ -173,7 +173,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             "admission_threshold": policy_config.admission_threshold,
             "ttl_seconds": policy_config.ttl_seconds,
             "eviction_priority": policy_config.eviction_priority,
-            "bandit_action": int(action)
+            "bandit_action": int(action),
         }
         tenant_id = getattr(request, "tenant_id", "system")
         self._logger.log_decision(tenant_id, query_features, system_metrics, decision)
@@ -204,7 +204,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         return policy_service_pb2.ModelList(
             models=[policy_service_pb2.ModelInfo(**m) for m in data["models"]],
             active_model_version=data["active_model_version"],
-            canary_model_version=data["canary_model_version"]
+            canary_model_version=data["canary_model_version"],
         )
 
     def TrainModel(self, request, context):
@@ -227,7 +227,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
         return policy_service_pb2.EvaluationMetrics(
             current_p99_improvement=0.25,  # Placeholder from evaluate_model.py logic
             current_cache_hit_rate=0.85,
-            other_metrics={"bandit_epsilon": self._bandit_engine.epsilon}
+            other_metrics={"bandit_epsilon": self._bandit_engine.epsilon},
         )
 
 

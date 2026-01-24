@@ -11,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class ModelManager:
-    def __init__(self, models_dir="models", staging_dir="models/staging", active_model_path="models/active.onnx", canary_model_path="models/canary.onnx"):
+    def __init__(
+        self,
+        models_dir="models",
+        staging_dir="models/staging",
+        active_model_path="models/active.onnx",
+        canary_model_path="models/canary.onnx",
+    ):
         self.models_dir = models_dir
         self.staging_dir = staging_dir
         self.active_model_path = active_model_path
@@ -43,12 +49,14 @@ class ModelManager:
             elif self.canary_version == version:
                 status = "canary"
 
-            models.append({
-                "version": version,
-                "created_at": created_at,
-                "status": status,
-                "evaluation_score": 0.0  # TODO: Store evaluations in a sidecar file
-            })
+            models.append(
+                {
+                    "version": version,
+                    "created_at": created_at,
+                    "status": status,
+                    "evaluation_score": 0.0,  # TODO: Store evaluations in a sidecar file
+                }
+            )
 
         # Sort by creation time desc
         models.sort(key=lambda x: x["created_at"], reverse=True)
@@ -59,7 +67,7 @@ class ModelManager:
         return {
             "models": models,
             "active_model_version": self.active_version or "none",
-            "canary_model_version": self.canary_version or "none"
+            "canary_model_version": self.canary_version or "none",
         }
 
     def train_model(self, dataset_path: Optional[str] = None) -> str:
@@ -159,7 +167,7 @@ class ModelManager:
         state = {
             "active_version": self.active_version,
             "canary_version": self.canary_version,
-            "canary_tenants": list(self.canary_tenants)
+            "canary_tenants": list(self.canary_tenants),
         }
         with open(os.path.join(self.models_dir, "state.json"), "w") as f:
             json.dump(state, f)
