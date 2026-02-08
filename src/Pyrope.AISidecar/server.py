@@ -85,6 +85,25 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
                 print(f"Error in training loop: {e}")
             time.sleep(60)
 
+    @staticmethod
+    def _resolve_tenant_id(request, context):
+        # Prefer tenant-id gRPC metadata for backward-compatible tenant routing.
+        if context is not None:
+            try:
+                for item in context.invocation_metadata():
+                    if hasattr(item, "key"):
+                        key = item.key
+                        value = item.value
+                    else:
+                        key, value = item
+                    if str(key).lower() == "tenant-id" and value:
+                        return str(value)
+            except Exception:
+                pass
+
+        tenant_id = getattr(request, "tenant_id", "")
+        return tenant_id if tenant_id else "system"
+
     def GetIndexPolicy(self, request, context):
         print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
         # P8-5: Check if tenant is canary
@@ -97,7 +116,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def ReportSystemMetrics(self, request, context):
         self._latest_system_features = self._feature_engineer.extract_system_features(request.qps, queue_depth=None)
 
-        tenant_id = getattr(request, "tenant_id", "system")
+        tenant_id = self._resolve_tenant_id(request, context)
         if self._model_manager.record_latency_p99(tenant_id, request.latency_p99_ms):
             logger.warning("Auto-rollback triggered for canary deployment due to P99 degradation")
 

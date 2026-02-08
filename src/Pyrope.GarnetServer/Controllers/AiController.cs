@@ -98,6 +98,21 @@ namespace Pyrope.GarnetServer.Controllers
                 var response = await _policyClient.DeployModelAsync(request);
                 if (response.Status.StartsWith("Error", StringComparison.OrdinalIgnoreCase))
                 {
+                    _auditLogger.Log(new AuditEvent(
+                        action: AuditActions.DeployModel,
+                        resourceType: AuditResourceTypes.Model,
+                        userId: GetCurrentUserId(),
+                        resourceId: request.Version,
+                        details: JsonSerializer.Serialize(new
+                        {
+                            request.Canary,
+                            CanaryTenants = request.CanaryTenants.ToArray(),
+                            response.Status
+                        }),
+                        ipAddress: GetClientIp(),
+                        success: false
+                    ));
+
                     return BadRequest(new { error = response.Status });
                 }
 

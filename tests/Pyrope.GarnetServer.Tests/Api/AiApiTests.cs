@@ -110,6 +110,27 @@ namespace Pyrope.GarnetServer.Tests.Api
             Assert.True(deployEvents[0].Success);
         }
 
+        [Fact]
+        public async Task DeployModel_SidecarBusinessError_RecordsFailedAuditLog()
+        {
+            _fakeClient.NextDeployResponse = new DeployResponse
+            {
+                Status = "Error: model version not found",
+                Version = ""
+            };
+
+            var requestJson = JsonSerializer.Serialize(new { version = "missing", canary = false, canaryTenants = new[] { "tenant-a" } });
+            var response = await _client.PostAsync("/v1/ai/models/deploy", new StringContent(requestJson, Encoding.UTF8, "application/json"));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(1, _fakeClient.DeployCalls);
+
+            var deployEvents = _auditLogger.Query(action: AuditActions.DeployModel).ToList();
+            Assert.Single(deployEvents);
+            Assert.Equal("missing", deployEvents[0].ResourceId);
+            Assert.False(deployEvents[0].Success);
+        }
+
         private sealed class FakePolicyServiceClient : PolicyService.PolicyServiceClient
         {
             public int ListModelsCalls { get; private set; }
