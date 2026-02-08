@@ -144,8 +144,8 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 | **P8-1** | [ML] | **Offline Model Training (GBDT/Linear)**<br>Train admission/TTL model from logged data. Implement Phase A: rules + GBDT. | P4-5 | [x] |
 | **P8-2** | [ML] | **Model Evaluation Pipeline**<br>Offline metrics: expected cost savings, P99 improvement simulation, cache occupancy, eviction count. | P8-1 | [x] |
 | **P8-3** | [ML] | **ONNX Export**<br>Export trained model to ONNX format for Hot Path integration. | P8-1 | [x] |
-| **P8-4** | [API] | **AI Model Management API**<br>`GET /v1/ai/models`, `POST /v1/ai/models/train`, `POST /v1/ai/models/deploy`, `POST /v1/ai/models/rollback`, `GET /v1/ai/evaluations`. | P8-2 | [ ] |
-| **P8-5** | [ML] | **Canary Deployment**<br>Deploy model to subset of tenants. Monitor metrics. Auto-rollback on P99 degradation. | P8-4, P4-6 | [ ] |
+| **P8-4** | [API] | **AI Model Management API**<br>`GET /v1/ai/models`, `POST /v1/ai/models/train`, `POST /v1/ai/models/deploy`, `POST /v1/ai/models/rollback`, `GET /v1/ai/evaluations`. | P8-2 | [x] |
+| **P8-5** | [ML] | **Canary Deployment**<br>Deploy model to subset of tenants. Monitor metrics. Auto-rollback on P99 degradation. | P8-4, P4-6 | [x] |
 | **P8-6** | [ML] | **Contextual Bandit (Phase B)**<br>Online fine-tuning of admission/TTL decisions. Explore-exploit for policy optimization. | P8-5 | [ ] |
 
 ---
@@ -297,6 +297,14 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - Implemented **P8-1 Offline Model Training**: Added `train_model.py` to train XGBoost/GBDT model on query logs with heuristic labeling.
 - Implemented **P8-2 Model Evaluation**: Added `evaluate_model.py` simulating AI impact (27% estimated P99 improvement).
 - Implemented **P8-3 ONNX Export**: Model is exported to `policy_model.onnx` and verified with `onnx.checker`.
+- Implemented **P8-4 AI Model Management API**:
+  - Added/validated endpoints in `AiController` (`/v1/ai/models`, `/train`, `/deploy`, `/rollback`, `/evaluations`) with request validation and error mapping.
+  - Added audit logging for model training/deploy/rollback operations.
+  - Added API integration tests (`AiApiTests`) with a fake gRPC sidecar client.
+- Implemented **P8-5 Canary Deployment**:
+  - Extended sidecar `ModelManager` with canary routing helpers and P99 degradation monitoring.
+  - Added automatic canary rollback when latency exceeds baseline ratio for a configured consecutive streak.
+  - Integrated canary telemetry checks into `ReportSystemMetrics` and added tests for rollback behavior and metric forwarding.
 
 ## Tests
 
@@ -322,6 +330,13 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 - `./scripts/load_test.sh` (P5-8)
 - `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter IvfFlatVectorIndexTests` (P10-8)
 - `./scripts/bench_vectors.sh ... --build-index` (P10-8 Benchmark)
+- `dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj --filter "FullyQualifiedName~AiApiTests"` (P8-4)
+- `PYTHONPATH=src/Pyrope.AISidecar src/Pyrope.AISidecar/.venv/bin/python -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_model_manager.py"` (P8-5)
+- `PYTHONPATH=src/Pyrope.AISidecar src/Pyrope.AISidecar/.venv/bin/python -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_server_canary.py"` (P8-5)
+- `dotnet test Pyrope.sln` (regression check)
+- `PYTHONPATH=src/Pyrope.AISidecar src/Pyrope.AISidecar/.venv/bin/python -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"` (regression check)
+- `./scripts/check_quality.sh`
+- `./scripts/bench_vectors.sh --dataset synthetic --dim 128 --base-limit 10000 --query-limit 100 --algorithm IVF_FLAT --params nlist=100 --api-key tenant1 --http http://127.0.0.1:5000 --admin-api-key bench-admin --build-index` (README benchmark)
 
 ---
 

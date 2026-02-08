@@ -93,6 +93,7 @@ namespace Pyrope.GarnetServer.Model
         public const string UpdatePolicy = "UPDATE_POLICY";
 
         // Model operations
+        public const string TrainModel = "TRAIN_MODEL";
         public const string DeployModel = "DEPLOY_MODEL";
         public const string RollbackModel = "ROLLBACK_MODEL";
     }

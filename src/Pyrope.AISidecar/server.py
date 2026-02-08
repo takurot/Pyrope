@@ -88,7 +88,7 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
     def GetIndexPolicy(self, request, context):
         print(f"Received request for tenant: {request.tenant_id}, index: {request.index_name}")
         # P8-5: Check if tenant is canary
-        if request.tenant_id in self._model_manager.canary_tenants:
+        if self._model_manager.is_canary_tenant(request.tenant_id):
             print(f"Tenant {request.tenant_id} routed to CANARY model {self._model_manager.canary_version}")
             # TODO: Load params from canary model config if available
 
@@ -96,6 +96,10 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
 
     def ReportSystemMetrics(self, request, context):
         self._latest_system_features = self._feature_engineer.extract_system_features(request.qps, queue_depth=None)
+
+        tenant_id = getattr(request, "tenant_id", "system")
+        if self._model_manager.record_latency_p99(tenant_id, request.latency_p99_ms):
+            logger.warning("Auto-rollback triggered for canary deployment due to P99 degradation")
 
         # P8-6: Online Learning Loop
         # 1. Update Bandit with previous reward (Change in miss rate?)
@@ -175,7 +179,6 @@ class PolicyService(policy_service_pb2_grpc.PolicyServiceServicer):
             "eviction_priority": policy_config.eviction_priority,
             "bandit_action": int(action),
         }
-        tenant_id = getattr(request, "tenant_id", "system")
         self._logger.log_decision(tenant_id, query_features, system_metrics, decision)
 
         return policy_service_pb2.SystemMetricsResponse(status="OK", next_report_interval_ms=0, policy=policy_proto)
