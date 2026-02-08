@@ -1,11 +1,12 @@
-import os
 import glob
 import json
-import shutil
 import logging
+import os
+import shutil
 import threading
+from collections import deque
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,10 @@ class ModelManager:
         staging_dir="models/staging",
         active_model_path="models/active.onnx",
         canary_model_path="models/canary.onnx",
+        canary_p99_degradation_ratio=1.2,
+        canary_min_baseline_samples=10,
+        canary_auto_rollback_streak=3,
+        canary_baseline_window=100,
     ):
         self.models_dir = models_dir
         self.staging_dir = staging_dir
@@ -26,6 +31,12 @@ class ModelManager:
         self.canary_version = None
         self.canary_tenants = set()
         self.lock = threading.Lock()
+
+        self.canary_p99_degradation_ratio = float(canary_p99_degradation_ratio)
+        self.canary_min_baseline_samples = int(canary_min_baseline_samples)
+        self.canary_auto_rollback_streak = int(canary_auto_rollback_streak)
+        self._baseline_p99_samples = deque(maxlen=max(1, int(canary_baseline_window)))
+        self._canary_degradation_streak = 0
 
         # Ensure directories exist
         os.makedirs(self.models_dir, exist_ok=True)
@@ -116,31 +127,66 @@ class ModelManager:
             shutil.copy2(src_path, self.canary_model_path)
             self.canary_version = version
             self.canary_tenants = set(tenants) if tenants else set()
+            self._canary_degradation_streak = 0
             logger.info(f"Deployed {version} as CANARY for tenants: {self.canary_tenants}")
         else:
             shutil.copy2(src_path, self.active_model_path)
             self.active_version = version
             # If promoting canary to active, maybe clear canary?
             if self.canary_version == version:
-                self.canary_version = None
-                self.canary_tenants = set()
+                self._rollback_canary_locked()
             logger.info(f"Deployed {version} as ACTIVE")
 
         self._save_state()
         return "OK"
 
+    def is_canary_tenant(self, tenant_id: str) -> bool:
+        with self.lock:
+            if not self.canary_version:
+                return False
+            # Empty tenant list means canary applies globally.
+            return not self.canary_tenants or tenant_id in self.canary_tenants
+
+    def record_latency_p99(self, tenant_id: str, latency_p99_ms: float) -> bool:
+        """Records latency and auto-rolls back canary when degradation persists.
+
+        Returns True when an automatic canary rollback was triggered.
+        """
+        with self.lock:
+            # Keep baseline from non-canary traffic (or all traffic when no canary is active).
+            if not self.canary_version or (self.canary_tenants and tenant_id not in self.canary_tenants):
+                self._baseline_p99_samples.append(float(latency_p99_ms))
+                return False
+
+            if len(self._baseline_p99_samples) < self.canary_min_baseline_samples:
+                return False
+
+            baseline = sum(self._baseline_p99_samples) / len(self._baseline_p99_samples)
+            threshold = baseline * self.canary_p99_degradation_ratio
+
+            if latency_p99_ms > threshold:
+                self._canary_degradation_streak += 1
+            else:
+                self._canary_degradation_streak = 0
+
+            if self._canary_degradation_streak >= self.canary_auto_rollback_streak:
+                logger.warning(
+                    "Canary latency degraded (latency_p99_ms=%.3f baseline=%.3f threshold=%.3f). Rolling back canary %s",
+                    latency_p99_ms,
+                    baseline,
+                    threshold,
+                    self.canary_version,
+                )
+                self._rollback_canary_locked()
+                self._canary_degradation_streak = 0
+                return True
+
+            return False
+
     def rollback_model(self, canary_only: bool = False) -> str:
         with self.lock:
             if canary_only:
-                if self.canary_version:
-                    logger.info(f"Rolling back canary {self.canary_version}")
-                    self.canary_version = None
-                    self.canary_tenants = set()
-                    if os.path.exists(self.canary_model_path):
-                        os.remove(self.canary_model_path)
-                    self._save_state()
-                    return "OK"
-                return "No canary to rollback"
+                return self._rollback_canary_locked()
 
             # Rollback active model... to what?
             # Ideally we track history. For now, let's just say we can't easily rollback active without a version
@@ -162,6 +208,17 @@ class ModelManager:
                 self._deploy_model_locked(prev_version, canary=False, tenants=None)
                 return f"Rolled back to {prev_version}"
             return "No previous version found to rollback to"
+
+    def _rollback_canary_locked(self) -> str:
+        if self.canary_version:
+            logger.info(f"Rolling back canary {self.canary_version}")
+            self.canary_version = None
+            self.canary_tenants = set()
+            if os.path.exists(self.canary_model_path):
+                os.remove(self.canary_model_path)
+            self._save_state()
+            return "OK"
+        return "No canary to rollback"
 
     def _save_state(self):
         state = {
