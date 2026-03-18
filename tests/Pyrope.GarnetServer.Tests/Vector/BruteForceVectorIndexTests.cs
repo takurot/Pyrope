@@ -94,16 +94,16 @@ namespace Pyrope.GarnetServer.Tests.Vector
 
             index.EnableQuantization = true;
 
-            // Should now use the newly computed quantized vector or behave correctly
-            // Since we re-enabled it after an upsert when it was disabled, we expect empty byte array
-            // If it uses stale data, it might return a wrong distance or score.
-            // Actually, if it's empty, BruteForceSearch skips it or handles it safely, instead of searching stale.
+            // After re-enabling quantization, the quantized data for "a" is Array.Empty<byte>() because
+            // it was cleared during the Upsert-while-disabled. The quantized search path skips entries
+            // where qTarget.Length == 0, so the result is empty.
+            // NOTE: This is expected behavior — entries upserted while quantization was disabled become
+            // invisible to quantized search until they are upserted again with quantization enabled.
+            // If the fix were absent (stale qTarget retained), Search would return the entry with
+            // the old quantized data {1f, 0f}, regardless of L2 distance, because topK=1 always picks
+            // the single available entry.
             var results = index.Search(new float[] { 0f, 1f }, 1);
 
-            // Since it skips empty byte arrays, it should return empty if it was properly cleared.
-            // If it returns a stale entry, this test will fail because it shouldn't have matched
-            // (the old vector was { 1f, 0f }, the query is { 0f, 1f }, L2 is far, but actually if stale data exists, it will still output it).
-            // Let's assert it is empty because it should have skipped.
             Assert.Empty(results);
         }
 
@@ -117,6 +117,8 @@ namespace Pyrope.GarnetServer.Tests.Vector
             index.Delete("a");
 
             // To test memory leak fix, we access the internal state via reflection to ensure references are null.
+            // NOTE: Field names "_vectors" and "_quantizedVectors" are hard-coded. If renamed, Assert.NotNull
+            // below will fail with a confusing message — update field names here accordingly.
             var vectorsField = typeof(BruteForceVectorIndex).GetField("_vectors", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var qVectorsField = typeof(BruteForceVectorIndex).GetField("_quantizedVectors", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
