@@ -1,4 +1,6 @@
 using System;
+using System.Net.Sockets;
+using System.Threading;
 using Garnet;
 using Garnet.server;
 using Microsoft.Extensions.Options;
@@ -22,8 +24,11 @@ namespace Pyrope.GarnetServer.Tests.Extensions
         private const string ApiKey = "testkey-auth";
         private readonly TenantRegistry _tenantRegistry = new();
         private readonly ITenantAuthenticator _tenantAuthenticator;
-        private readonly Garnet.GarnetServer _server;
+        private readonly Garnet.GarnetServer? _server;
         private readonly int _port;
+
+        // Use Interlocked counter to avoid port collisions when tests run in parallel.
+        private static int _portCounter = 7300;
 
         public RespAuthIntegrationTests()
         {
@@ -33,7 +38,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             _tenantAuthenticator = new TenantApiKeyAuthenticator(_tenantRegistry, opts);
             _tenantRegistry.TryCreate(Tenant, new TenantQuota(), out _, apiKey: ApiKey);
 
-            _port = 7200 + new Random().Next(500);
+            _port = Interlocked.Increment(ref _portCounter);
             var authSettings = new PyropeAuthenticationSettings(_tenantAuthenticator);
 
             _server = new Garnet.GarnetServer(
@@ -53,14 +58,33 @@ namespace Pyrope.GarnetServer.Tests.Extensions
                 new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
 
             _server.Start();
-            // Give the server a moment to bind and start accepting connections
-            System.Threading.Thread.Sleep(200);
+            WaitForServerReady(_port);
         }
 
         public void Dispose()
         {
             SessionAuthContext.Reset();
-            _server.Dispose();
+            _server?.Dispose();
+        }
+
+        /// <summary>Poll until the server accepts TCP connections or the deadline passes.</summary>
+        private static void WaitForServerReady(int port, int timeoutMs = 3000)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    using var tcp = new TcpClient();
+                    tcp.Connect("127.0.0.1", port);
+                    return;
+                }
+                catch
+                {
+                    Thread.Sleep(50);
+                }
+            }
+            throw new TimeoutException($"Server did not start on port {port} within {timeoutMs}ms.");
         }
 
         [Fact]

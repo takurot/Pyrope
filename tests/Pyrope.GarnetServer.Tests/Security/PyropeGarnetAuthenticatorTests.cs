@@ -23,8 +23,9 @@ namespace Pyrope.GarnetServer.Tests.Security
         public void Dispose() => SessionAuthContext.Reset();
 
         [Fact]
-        public void Authenticate_ValidTenant_ReturnsTrue()
+        public void Authenticate_AclFormat_ValidCredentials_ReturnsTrue()
         {
+            // ACL-format: username=tenantId, password=apiKey (Redis 6 style)
             var authenticator = new PyropeGarnetAuthenticator(_tenantAuthenticator);
             bool result = authenticator.Authenticate(
                 System.Text.Encoding.UTF8.GetBytes("tenant1"),
@@ -35,8 +36,9 @@ namespace Pyrope.GarnetServer.Tests.Security
         }
 
         [Fact]
-        public void Authenticate_ValidTenant_SetsSessionContext()
+        public void Authenticate_AclFormat_ValidCredentials_SetsSessionContext()
         {
+            // ACL-format: username=tenantId, password=apiKey (Redis 6 style)
             var authenticator = new PyropeGarnetAuthenticator(_tenantAuthenticator);
             authenticator.Authenticate(
                 System.Text.Encoding.UTF8.GetBytes("tenant1"),

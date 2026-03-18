@@ -4,9 +4,10 @@ namespace Pyrope.GarnetServer.Security
 {
     /// <summary>
     /// Stores the authenticated tenant context for the current Garnet connection session.
-    /// Uses AsyncLocal so the value flows through async continuations and task dispatches,
-    /// which is necessary because Garnet may execute custom command callbacks on a different
-    /// thread than the one that processed the AUTH command.
+    /// Uses AsyncLocal so the value is scoped to the current execution context and flows
+    /// through async continuations. Garnet processes commands for a given connection on a
+    /// dedicated session thread, so AUTH and subsequent VEC commands run in the same execution
+    /// context — the AsyncLocal value set by AUTH is visible to VEC command handlers.
     /// Call Reset() in tests to ensure isolation between test cases.
     /// </summary>
     public static class SessionAuthContext

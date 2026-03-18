@@ -30,8 +30,10 @@ namespace Pyrope.GarnetServer.Security
         public bool CanAuthenticate => true;
 
         /// <summary>
-        /// False: uses Garnet's non-ACL AUTH path. Supports single-arg AUTH "tenantId:apiKey".
-        /// ACL-format AUTH (separate username + password) is not supported in this release.
+        /// False: uses Garnet's non-ACL AUTH path. StackExchange.Redis with HasACLSupport=false
+        /// sends credentials in the USERNAME field as "tenantId:apiKey", which this authenticator
+        /// handles. Both single-arg ("tenantId:apiKey" in password) and ACL-format (username=tenantId,
+        /// password=apiKey) are supported regardless of this flag.
         /// </summary>
         public bool HasACLSupport => false;
 
