@@ -22,7 +22,12 @@ namespace Pyrope.GarnetServer.Vector
 
         private readonly ReaderWriterLockSlim _lock = new();
 
-        public bool EnableQuantization { get; set; } = false;
+        private volatile bool _enableQuantization = false;
+        public bool EnableQuantization
+        {
+            get => _enableQuantization;
+            set => _enableQuantization = value;
+        }
 
         public BruteForceVectorIndex(int dimension, VectorMetric metric)
         {
