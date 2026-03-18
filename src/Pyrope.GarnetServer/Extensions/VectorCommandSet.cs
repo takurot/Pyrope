@@ -223,7 +223,8 @@ namespace Pyrope.GarnetServer.Extensions
                                             LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
                                             PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
                                             CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                            FaissMs = 0
+                                            FaissMs = 0,
+                                            MetadataMs = 0
                                         })
                                         : null;
                                     WriteResults(ref output, cachedHits, request.IncludeMeta, traceJson);
@@ -257,7 +258,8 @@ namespace Pyrope.GarnetServer.Extensions
                                                     LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
                                                     PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
                                                     CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                                    FaissMs = 0
+                                                    FaissMs = 0,
+                                                    MetadataMs = 0
                                                 })
                                                 : null;
                                             WriteResults(ref output, aliasHits, request.IncludeMeta, traceJson);
@@ -292,7 +294,8 @@ namespace Pyrope.GarnetServer.Extensions
                                                     LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
                                                     PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
                                                     CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                                    FaissMs = 0
+                                                    FaissMs = 0,
+                                                    MetadataMs = 0
                                                 })
                                                 : null;
                                             WriteResults(ref output, l1Hits, request.IncludeMeta, traceJson);
@@ -396,7 +399,8 @@ namespace Pyrope.GarnetServer.Extensions
                                                         LatencyMs = ElapsedMilliseconds(totalStart, totalEnd),
                                                         PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
                                                         CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
-                                                        FaissMs = 0
+                                                        FaissMs = 0,
+                                                        MetadataMs = 0
                                                     })
                                                     : null;
                                                 WriteResults(ref output, l2Hits, request.IncludeMeta, traceJson);
@@ -453,7 +457,7 @@ namespace Pyrope.GarnetServer.Extensions
                     faissStart = Stopwatch.GetTimestamp();
                     var rawResults = index.Search(request.Vector, request.TopK, searchOptions);
                     faissEnd = Stopwatch.GetTimestamp();
-                    metadataStart = faissEnd;
+                    metadataStart = faissEnd; // reuse faissEnd to avoid an extra GetTimestamp() call
                     var results = new List<SearchHitDto>(rawResults.Count);
                     foreach (var hit in rawResults)
                     {

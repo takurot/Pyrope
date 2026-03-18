@@ -102,7 +102,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             var faissMs = doc.RootElement.GetProperty("FaissMs").GetDouble();
             var metadataMs = doc.RootElement.GetProperty("MetadataMs").GetDouble();
 
-            // FaissMs must be positive — faissStart is now correctly captured before index.Search()
+            // FaissMs must be non-negative — faissStart is now correctly captured before index.Search()
             Assert.True(faissMs >= 0, $"FaissMs should be non-negative, got {faissMs:F3}ms");
             // MetadataMs must be non-negative — captures Store.TryGet + post-filter time
             Assert.True(metadataMs >= 0, $"MetadataMs should be non-negative, got {metadataMs:F3}ms");
