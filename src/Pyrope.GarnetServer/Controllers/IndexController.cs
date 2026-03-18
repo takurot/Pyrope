@@ -100,7 +100,10 @@ namespace Pyrope.GarnetServer.Controllers
                 {
                     var centroids = centroidsProvider.GetCentroids();
                     if (centroids != null)
-                        _clusterRegistry.UpdateCentroids(tenantId, indexName, new System.Collections.Generic.List<float[]>(centroids));
+                    {
+                        _clusterRegistry.UpdateCentroids(tenantId, indexName, centroids.ToList());
+                        _registry.IncrementEpoch(tenantId, indexName); // Invalidate L2 cache: cluster IDs may have changed
+                    }
                 }
 
                 // Audit log
