@@ -63,5 +63,52 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             Assert.Equal(2, result!.Length);
             Assert.Contains("\"RequestId\":\"req-1\"", result[1].ToString());
         }
+
+        [Fact]
+        public void Search_WithTrace_IncludesMetadataMs()
+        {
+            using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
+            var db = redis.GetDatabase();
+            db.Execute("VEC.ADD", "t_trace", "i_meta_ms", "d1", "VECTOR", "[1,0]", "API_KEY", TenantApiKey);
+            db.Execute("VEC.ADD", "t_trace", "i_meta_ms", "d2", "VECTOR", "[0,1]", "API_KEY", TenantApiKey);
+
+            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_trace", "i_meta_ms", "TOPK", "2", "VECTOR", "[1,0]", "TRACE", "API_KEY", TenantApiKey);
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result!.Length);
+            var trace = result[1].ToString()!;
+            Assert.Contains("\"MetadataMs\":", trace);
+        }
+
+        [Fact]
+        public void Search_WithTrace_FaissAndMetadataMsAreNonNegative()
+        {
+            // FaissMs and MetadataMs should be correctly measured (non-negative, non-zero for FAISS path)
+            using var redis = ConnectionMultiplexer.Connect($"127.0.0.1:{_port}");
+            var db = redis.GetDatabase();
+            for (int i = 0; i < 5; i++)
+            {
+                db.Execute("VEC.ADD", "t_trace", "i_gap", $"d{i}", "VECTOR", $"[{i},0]", "META", $"{{\"idx\":{i}}}", "API_KEY", TenantApiKey);
+            }
+
+            var result = (RedisResult[]?)db.Execute("VEC.SEARCH", "t_trace", "i_gap", "TOPK", "5", "VECTOR", "[1,0]", "TRACE", "WITH_META", "API_KEY", TenantApiKey);
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result!.Length);
+            var trace = result[1].ToString()!;
+
+            var doc = System.Text.Json.JsonDocument.Parse(trace);
+            var latencyMs = doc.RootElement.GetProperty("LatencyMs").GetDouble();
+            var faissMs = doc.RootElement.GetProperty("FaissMs").GetDouble();
+            var metadataMs = doc.RootElement.GetProperty("MetadataMs").GetDouble();
+
+            // FaissMs must be non-negative — faissStart is now correctly captured before index.Search()
+            Assert.True(faissMs >= 0, $"FaissMs should be non-negative, got {faissMs:F3}ms");
+            // MetadataMs must be non-negative — captures Store.TryGet + post-filter time
+            Assert.True(metadataMs >= 0, $"MetadataMs should be non-negative, got {metadataMs:F3}ms");
+            // LatencyMs must be at least as large as FaissMs + MetadataMs
+            Assert.True(latencyMs >= faissMs + metadataMs,
+                $"LatencyMs ({latencyMs:F3}ms) should cover FaissMs ({faissMs:F3}ms) + MetadataMs ({metadataMs:F3}ms)");
+        }
     }
 }
