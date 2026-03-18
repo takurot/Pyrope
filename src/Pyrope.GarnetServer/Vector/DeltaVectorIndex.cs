@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Pyrope.GarnetServer.Vector
 {
-    public class DeltaVectorIndex : IVectorIndex
+    public class DeltaVectorIndex : IVectorIndex, ICentroidsProvider
     {
         private readonly IVectorIndex _head;
         private readonly IVectorIndex _tail;
@@ -221,6 +221,19 @@ namespace Pyrope.GarnetServer.Vector
                 // Count is approx sum (minus duplicates). accurate count is expensive without keeping ID set.
                 // Just sum for now.
                 return new IndexStats(h.Count + t.Count, h.Dimension, h.Metric);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        public IReadOnlyList<float[]>? GetCentroids()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                return _tail is ICentroidsProvider cp ? cp.GetCentroids() : null;
             }
             finally
             {

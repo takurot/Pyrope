@@ -225,6 +225,7 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#51] Automatic Centroid Sync between IVF Index and SemanticClusterRegistry: Added `ICentroidsProvider` interface implemented by `IvfFlatVectorIndex` and `DeltaVectorIndex`. `IndexController.BuildIndex` now auto-syncs centroids to `SemanticClusterRegistry` after build, enabling L2 Semantic Cache and Prefetching without manual HTTP API calls.
 - Fixed [#50] Latency Gap in `VEC.SEARCH TRACE`: Added `MetadataMs` field to trace output to capture `Store.TryGet` + post-filter time. Also fixed `faissStart` timestamp that was never assigned (causing `FaissMs=0` always). Both fields are now correctly measured and reported in `TRACE` output.
 - Implemented `VEC.ADD`/`VEC.UPSERT` parsing with `VECTOR`, `META`, `TAGS`, and `NUMERIC_FIELDS` handling.
 - Added in-memory `VectorStore` and `VectorIndexRegistry` with vector parsing for JSON/CSV/binary payloads.

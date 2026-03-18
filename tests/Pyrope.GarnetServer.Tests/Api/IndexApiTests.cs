@@ -226,5 +226,46 @@ namespace Pyrope.GarnetServer.Tests.Api
             var response = await client.GetAsync("/v1/health");
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
+
+        [Fact]
+        public async Task Build_AutoSyncsCentroidsToSemanticClusterRegistry()
+        {
+            var tenantId = "tenant_centroid_sync";
+            var indexName = "idx_centroid_sync";
+
+            // Create index with IVF_FLAT algorithm
+            var createRequest = new CreateIndexRequest
+            {
+                TenantId = tenantId,
+                IndexName = indexName,
+                Dimension = 2,
+                Metric = "L2",
+                Algorithm = "IVF_FLAT",
+                Parameters = new System.Collections.Generic.Dictionary<string, object> { ["nlist"] = 2 }
+            };
+            var createResp = await _client.PostAsync("/v1/indexes",
+                new StringContent(JsonSerializer.Serialize(createRequest), Encoding.UTF8, "application/json"));
+            createResp.EnsureSuccessStatusCode();
+
+            // Add vectors directly via the registry
+            using var scope = _factory.Services.CreateScope();
+            var registry = scope.ServiceProvider.GetRequiredService<VectorIndexRegistry>();
+            var index = registry.GetOrCreate(tenantId, indexName, 2, Pyrope.GarnetServer.Vector.VectorMetric.L2);
+            index.Add("v1", new float[] { 0.1f, 0.1f });
+            index.Add("v2", new float[] { 0.2f, 0.2f });
+            index.Add("v3", new float[] { 10f, 10f });
+            index.Add("v4", new float[] { 11f, 11f });
+
+            // Build via HTTP API
+            var buildResp = await _client.PostAsync($"/v1/indexes/{tenantId}/{indexName}/build", null);
+            buildResp.EnsureSuccessStatusCode();
+
+            // Verify centroids were auto-synced to SemanticClusterRegistry
+            var clusterRegistry = scope.ServiceProvider.GetRequiredService<SemanticClusterRegistry>();
+            var centroids = clusterRegistry.GetCentroids(tenantId, indexName);
+
+            Assert.NotNull(centroids);
+            Assert.True(centroids!.Count > 0, "SemanticClusterRegistry should have centroids after Build");
+        }
     }
 }

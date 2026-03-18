@@ -76,5 +76,31 @@ namespace Pyrope.GarnetServer.Tests.Vector
             var res = _deltaIndex.Search(new float[] { 1, 0 }, 10);
             Assert.Empty(res);
         }
+
+        [Fact]
+        public void GetCentroids_WhenTailIsIvfFlat_AfterBuild_ReturnsCentroids()
+        {
+            var head = new BruteForceVectorIndex(2, VectorMetric.L2);
+            var tail = new IvfFlatVectorIndex(2, VectorMetric.L2, nList: 2);
+            var delta = new DeltaVectorIndex(head, tail);
+
+            tail.Add("a1", new float[] { 0.1f, 0.1f });
+            tail.Add("b1", new float[] { 10f, 10f });
+            tail.Build();
+
+            var provider = (ICentroidsProvider)delta;
+            var centroids = provider.GetCentroids();
+            Assert.NotNull(centroids);
+            Assert.True(centroids!.Count > 0);
+        }
+
+        [Fact]
+        public void GetCentroids_WhenTailIsNotIvfFlat_ReturnsNull()
+        {
+            // Default DeltaVectorIndex uses BruteForce tail (from constructor)
+            var provider = (ICentroidsProvider)_deltaIndex;
+            var centroids = provider.GetCentroids();
+            Assert.Null(centroids);
+        }
     }
 }
