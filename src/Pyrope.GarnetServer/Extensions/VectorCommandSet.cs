@@ -191,6 +191,8 @@ namespace Pyrope.GarnetServer.Extensions
                     long cacheEnd = 0;
                     long faissStart = 0;
                     long faissEnd = 0;
+                    long metadataStart = 0;
+                    long metadataEnd = 0;
                     var cacheHit = false;
 
                     if (_policyEngine != null && _resultCache != null)
@@ -448,8 +450,10 @@ namespace Pyrope.GarnetServer.Extensions
                             budgetAdjustment = new { reason = "budget_exceeded", original_max_scans = originalScans, new_max_scans = reducedScans };
                         }
                     }
+                    faissStart = Stopwatch.GetTimestamp();
                     var rawResults = index.Search(request.Vector, request.TopK, searchOptions);
                     faissEnd = Stopwatch.GetTimestamp();
+                    metadataStart = faissEnd;
                     var results = new List<SearchHitDto>(rawResults.Count);
                     foreach (var hit in rawResults)
                     {
@@ -470,6 +474,7 @@ namespace Pyrope.GarnetServer.Extensions
 
                         results.Add(new SearchHitDto { Id = hit.Id, Score = hit.Score, MetaJson = record.MetaJson });
                     }
+                    metadataEnd = Stopwatch.GetTimestamp();
 
                     var totalFinish = Stopwatch.GetTimestamp();
                     var tracePayload = traceEnabled
@@ -481,6 +486,7 @@ namespace Pyrope.GarnetServer.Extensions
                             PolicyMs = ElapsedMilliseconds(policyStart, policyEnd),
                             CacheMs = ElapsedMilliseconds(cacheStart, cacheEnd),
                             FaissMs = ElapsedMilliseconds(faissStart, faissEnd),
+                            MetadataMs = ElapsedMilliseconds(metadataStart, metadataEnd),
                             BudgetAdjustment = budgetAdjustment
                         })
                         : null;
@@ -889,6 +895,7 @@ namespace Pyrope.GarnetServer.Extensions
             public double PolicyMs { get; set; }
             public double CacheMs { get; set; }
             public double FaissMs { get; set; }
+            public double MetadataMs { get; set; }
             public object? BudgetAdjustment { get; set; }
         }
         private static bool IsClusterCloseEnough(float score, VectorMetric metric, float queryCost)
