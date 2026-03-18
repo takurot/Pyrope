@@ -79,7 +79,7 @@ namespace Pyrope.GarnetServer.Tests.Extensions
             Assert.Equal("VEC_OK", result.ToString());
         }
 
-[Fact]
+        [Fact]
         public void VecAdd_NoAuth_NoApiKey_Fails()
         {
             // No AUTH, no API_KEY → should fail
