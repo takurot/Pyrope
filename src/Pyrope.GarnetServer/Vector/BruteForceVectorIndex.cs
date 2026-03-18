@@ -22,7 +22,22 @@ namespace Pyrope.GarnetServer.Vector
 
         private readonly ReaderWriterLockSlim _lock = new();
 
-        public bool EnableQuantization { get; set; } = false;
+        private volatile bool _enableQuantization = false;
+
+        /// <summary>
+        /// Enables or disables scalar quantization for search operations.
+        /// When <c>true</c>, <see cref="Search"/> uses 8-bit quantized vectors for faster distance computation.
+        /// <para>
+        /// <b>Important:</b> Entries added or upserted while this property is <c>false</c> will have
+        /// empty quantized data. If quantization is later re-enabled, those entries will be invisible
+        /// to quantized search until they are upserted again with quantization enabled.
+        /// </para>
+        /// </summary>
+        public bool EnableQuantization
+        {
+            get => _enableQuantization;
+            set => _enableQuantization = value;
+        }
 
         public BruteForceVectorIndex(int dimension, VectorMetric metric)
         {
