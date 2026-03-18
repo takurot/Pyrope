@@ -725,6 +725,14 @@ namespace Pyrope.GarnetServer.Extensions
 
         private bool TryAuthenticate(string tenantId, string? apiKey, ref RespMemoryWriter output)
         {
+            // Session-based auth: if the connection was authenticated via standard Redis AUTH
+            // and the authenticated tenantId matches, skip per-command API_KEY.
+            if (Security.SessionAuthContext.IsAuthenticated &&
+                Security.SessionAuthContext.AuthenticatedTenantId == tenantId)
+            {
+                return true;
+            }
+
             if (_tenantAuthenticator == null)
             {
                 WriteErrorCode(ref output, VectorErrorCodes.Auth, "Authenticator not configured.");

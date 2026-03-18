@@ -60,7 +60,8 @@ namespace Pyrope.GarnetServer.Services
             var garnetArgs = (args ?? Array.Empty<string>())
                 .Where(arg => !arg.StartsWith("--urls", StringComparison.OrdinalIgnoreCase))
                 .ToArray();
-            _server = new Garnet.GarnetServer(garnetArgs);
+            var authSettings = new Security.PyropeAuthenticationSettings(tenantAuthenticator);
+            _server = new Garnet.GarnetServer(garnetArgs, authenticationSettingsOverride: authSettings);
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
