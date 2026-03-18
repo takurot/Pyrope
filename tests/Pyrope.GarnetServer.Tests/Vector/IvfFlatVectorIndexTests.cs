@@ -9,6 +9,46 @@ namespace Pyrope.GarnetServer.Tests.Vector
     public class IvfFlatVectorIndexTests
     {
         [Fact]
+        public void GetCentroids_BeforeBuild_ReturnsNull()
+        {
+            var index = new IvfFlatVectorIndex(2, VectorMetric.L2, nList: 2);
+            index.Add("a", new float[] { 1f, 0f });
+
+            var centroids = index.GetCentroids();
+            Assert.Null(centroids);
+        }
+
+        [Fact]
+        public void GetCentroids_AfterBuild_ReturnsNonNullList()
+        {
+            var index = new IvfFlatVectorIndex(2, VectorMetric.L2, nList: 2);
+            index.Add("a1", new float[] { 0.1f, 0.1f });
+            index.Add("a2", new float[] { 0.2f, 0.2f });
+            index.Add("b1", new float[] { 10.1f, 10.1f });
+            index.Add("b2", new float[] { 10.2f, 10.2f });
+            index.Build();
+
+            var centroids = index.GetCentroids();
+            Assert.NotNull(centroids);
+            Assert.Equal(2, centroids!.Count);
+            Assert.All(centroids, c => Assert.Equal(2, c.Length));
+        }
+
+        [Fact]
+        public void GetCentroids_AfterBuild_ImplementsICentroidsProvider()
+        {
+            var index = new IvfFlatVectorIndex(2, VectorMetric.L2, nList: 1);
+            index.Add("a", new float[] { 1f, 0f });
+            index.Build();
+
+            Assert.IsAssignableFrom<ICentroidsProvider>(index);
+            var provider = (ICentroidsProvider)index;
+            var centroids = provider.GetCentroids();
+            Assert.NotNull(centroids);
+        }
+
+
+        [Fact]
         public void Search_BeforeBuild_ReturnsResultsFromBuffer()
         {
             // Even if not built, it should likely return results (or minimal implementation might require Build)

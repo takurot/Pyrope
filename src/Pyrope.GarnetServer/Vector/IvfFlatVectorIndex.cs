@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace Pyrope.GarnetServer.Vector
 {
-    public class IvfFlatVectorIndex : IVectorIndex
+    public class IvfFlatVectorIndex : IVectorIndex, ICentroidsProvider
     {
         private readonly ReaderWriterLockSlim _lock = new();
 
@@ -304,6 +304,19 @@ namespace Pyrope.GarnetServer.Vector
             {
                 int count = _buffer.Count + _invertedLists.Values.Sum(x => x.Count);
                 return new IndexStats(count, Dimension, Metric.ToString());
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        public IReadOnlyList<float[]>? GetCentroids()
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                return _isBuilt ? _centroids.AsReadOnly() : null;
             }
             finally
             {

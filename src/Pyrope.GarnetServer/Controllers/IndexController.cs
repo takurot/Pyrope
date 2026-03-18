@@ -16,12 +16,14 @@ namespace Pyrope.GarnetServer.Controllers
         private readonly VectorIndexRegistry _registry;
         private readonly IAuditLogger _auditLogger;
         private readonly IBillingMeter _billingMeter;
+        private readonly SemanticClusterRegistry _clusterRegistry;
 
-        public IndexController(VectorIndexRegistry registry, IAuditLogger auditLogger, IBillingMeter billingMeter)
+        public IndexController(VectorIndexRegistry registry, IAuditLogger auditLogger, IBillingMeter billingMeter, SemanticClusterRegistry clusterRegistry)
         {
             _registry = registry;
             _auditLogger = auditLogger;
             _billingMeter = billingMeter;
+            _clusterRegistry = clusterRegistry;
         }
 
         [HttpPost]
@@ -92,6 +94,17 @@ namespace Pyrope.GarnetServer.Controllers
             if (_registry.TryGetIndex(tenantId, indexName, out var index))
             {
                 index.Build();
+
+                // Auto-sync centroids to SemanticClusterRegistry for L2 Semantic Cache and Prefetching
+                if (index is ICentroidsProvider centroidsProvider)
+                {
+                    var centroids = centroidsProvider.GetCentroids();
+                    if (centroids != null)
+                    {
+                        _clusterRegistry.UpdateCentroids(tenantId, indexName, centroids.ToList());
+                        _registry.IncrementEpoch(tenantId, indexName); // Invalidate L2 cache: cluster IDs may have changed
+                    }
+                }
 
                 // Audit log
                 _auditLogger.Log(new AuditEvent(
