@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Options;
 using Pyrope.GarnetServer.Services;
+using Pyrope.GarnetServer.Utils;
 
 namespace Pyrope.GarnetServer.Security
 {
@@ -19,9 +20,16 @@ namespace Pyrope.GarnetServer.Security
         {
             errorMessage = null;
 
-            if (!_options.Enabled)
+            if (string.IsNullOrWhiteSpace(tenantId))
             {
-                return true;
+                errorMessage = "Missing tenant ID.";
+                return false;
+            }
+
+            if (!TenantNamespace.TryValidateTenantId(tenantId, out var tenantError))
+            {
+                errorMessage = tenantError;
+                return false;
             }
 
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -42,7 +50,7 @@ namespace Pyrope.GarnetServer.Security
                 return false;
             }
 
-            if (!string.Equals(apiKey, config.ApiKey, StringComparison.Ordinal))
+            if (!SecurityUtils.FixedTimeEquals(apiKey, config.ApiKey))
             {
                 errorMessage = "Invalid API key.";
                 return false;

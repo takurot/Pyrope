@@ -126,6 +126,45 @@ namespace Pyrope.GarnetServer.Tests.Security
         }
 
         [Fact]
+        public void Constructor_ResetsSessionAuthContext()
+        {
+            SessionAuthContext.Set("tenant1");
+            Assert.True(SessionAuthContext.IsAuthenticated);
+
+            _ = new PyropeGarnetAuthenticator(_tenantAuthenticator);
+            Assert.False(SessionAuthContext.IsAuthenticated);
+        }
+
+        [Fact]
+        public void Authenticate_FailedAuth_ClearsExistingSession()
+        {
+            var authenticator = new PyropeGarnetAuthenticator(_tenantAuthenticator);
+            authenticator.Authenticate(
+                System.Text.Encoding.UTF8.GetBytes("tenant1"),
+                System.Text.Encoding.UTF8.GetBytes("secret123"));
+            Assert.True(SessionAuthContext.IsAuthenticated);
+
+            // Re-auth with wrong credentials
+            authenticator.Authenticate(
+                System.Text.Encoding.UTF8.GetBytes("tenant1"),
+                System.Text.Encoding.UTF8.GetBytes("wrongkey"));
+            Assert.False(SessionAuthContext.IsAuthenticated);
+        }
+
+        [Fact]
+        public void Dispose_ClearsSessionAuthContext()
+        {
+            var authenticator = new PyropeGarnetAuthenticator(_tenantAuthenticator);
+            authenticator.Authenticate(
+                System.Text.Encoding.UTF8.GetBytes("tenant1"),
+                System.Text.Encoding.UTF8.GetBytes("secret123"));
+            Assert.True(SessionAuthContext.IsAuthenticated);
+
+            authenticator.Dispose();
+            Assert.False(SessionAuthContext.IsAuthenticated);
+        }
+
+        [Fact]
         public void CanAuthenticate_IsTrue()
         {
             var authenticator = new PyropeGarnetAuthenticator(_tenantAuthenticator);

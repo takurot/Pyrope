@@ -13,13 +13,16 @@ namespace Pyrope.GarnetServer.Security
     /// On success, sets <see cref="SessionAuthContext"/> so subsequent VEC.* commands
     /// in the same execution context can skip the per-command API_KEY argument.
     /// </summary>
-    public sealed class PyropeGarnetAuthenticator : IGarnetAuthenticator
+    public sealed class PyropeGarnetAuthenticator : IGarnetAuthenticator, IDisposable
     {
         private readonly ITenantAuthenticator _tenantAuthenticator;
+        private bool _disposed;
 
         public PyropeGarnetAuthenticator(ITenantAuthenticator tenantAuthenticator)
         {
             _tenantAuthenticator = tenantAuthenticator ?? throw new ArgumentNullException(nameof(tenantAuthenticator));
+            // Ensure any stale context from a recycled thread is cleared upon session start
+            SessionAuthContext.Reset();
         }
 
         /// <summary>
@@ -59,6 +62,8 @@ namespace Pyrope.GarnetServer.Security
             bool isDefaultOrEmpty = username.IsEmpty ||
                                     string.Equals(usernameStr, "default", StringComparison.OrdinalIgnoreCase);
 
+            bool authenticated = false;
+
             if (!isDefaultOrEmpty)
             {
                 // Check if username contains colon: StackExchange.Redis sends "tenantId:apiKey"
@@ -69,13 +74,19 @@ namespace Pyrope.GarnetServer.Security
                     var tenantId = usernameStr[..sep];
                     var apiKey = usernameStr[(sep + 1)..];
                     if (_tenantAuthenticator.TryAuthenticate(tenantId, apiKey, out _))
+                    {
                         SessionAuthContext.Set(tenantId);
+                        authenticated = true;
+                    }
                 }
                 else
                 {
                     // ACL-format AUTH: username = tenantId, password = apiKey
                     if (_tenantAuthenticator.TryAuthenticate(usernameStr, passwordStr, out _))
+                    {
                         SessionAuthContext.Set(usernameStr);
+                        authenticated = true;
+                    }
                 }
             }
             else
@@ -87,13 +98,31 @@ namespace Pyrope.GarnetServer.Security
                     var tenantId = passwordStr[..sep];
                     var apiKey = passwordStr[(sep + 1)..];
                     if (_tenantAuthenticator.TryAuthenticate(tenantId, apiKey, out _))
+                    {
                         SessionAuthContext.Set(tenantId);
+                        authenticated = true;
+                    }
                 }
+            }
+
+            if (!authenticated)
+            {
+                // On any failed auth attempt, clear any previously authenticated session
+                SessionAuthContext.Reset();
             }
 
             // Always return true: Garnet connection stays open regardless of credential validity.
             // VEC commands enforce the actual tenant auth.
             return true;
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                SessionAuthContext.Reset();
+                _disposed = true;
+            }
         }
     }
 }

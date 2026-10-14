@@ -53,7 +53,7 @@ namespace Pyrope.GarnetServer.Security
             var apiKey = apiKeyValues.ToString();
 
             // 1. Check Admin API Key
-            if (string.Equals(apiKey, _options.AdminApiKey, StringComparison.Ordinal))
+            if (SecurityUtils.FixedTimeEquals(apiKey, _options.AdminApiKey))
             {
                 context.Items["PyropeApiKey"] = apiKey;
                 context.Items["PyropeUserId"] = "admin";

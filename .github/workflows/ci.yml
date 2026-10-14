@@ -97,13 +97,13 @@ jobs:
 
       - name: Start Server
         env:
-          Auth__Enabled: "false"
+          PYROPE_ADMIN_API_KEY: "dev"
         run: |
           dotnet run --project src/Pyrope.GarnetServer/Pyrope.GarnetServer.csproj --configuration Release -- --port 3278 &
           sleep 15  # Wait for server to start
 
       - name: Run Smoke Test
-        run: python tests/smoke_test.py --port 3278
+        run: python tests/smoke_test.py --port 3278 --http-port 5000 --admin-api-key dev
         timeout-minutes: 2
 
   security-scan:
