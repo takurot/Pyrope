@@ -225,6 +225,12 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#59] mTLS hostname validation in SidecarExtensions:
+  - Extracted certificate validation logic into `SidecarExtensions.ValidateRemoteCertificate`.
+  - Enforced server hostname matching (`RemoteCertificateNameMismatch`) when `skipServerNameValidation` is false.
+  - Properly handled null certificate and `RemoteCertificateNotAvailable` errors.
+  - Maintained `skipServerNameValidation` toggle support and custom CA trust verification via `X509Chain`.
+  - Added unit test suite `SidecarExtensionsTests` covering null cert, mismatch rejection, skip behavior, untrusted certs, and fallback.
 - Fixed [#58] IDOR: Cross-tenant audit log exposure in AuditController:
   - Enforced tenant matching between caller context (`PyropeTenantId`) and queried `tenantId` in `AuditController.GetLogs` and `GetStats`, forbidding cross-tenant access.
   - Implemented `IAuditLogger.GetCount(string? tenantId)` for accurate scoped counts without limit truncation.
