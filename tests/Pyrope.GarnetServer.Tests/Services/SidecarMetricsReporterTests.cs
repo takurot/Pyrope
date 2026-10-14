@@ -31,7 +31,7 @@ namespace Pyrope.GarnetServer.Tests.Services
 
             var metrics = new MetricsCollector();
             var systemUsageProvider = new TestSystemUsageProvider();
-            var billingMeter = new BillingMeter(new BillingOptions { CostUnitSeconds = 1.0 });
+            var billingMeter = new BillingMeter(new BillingOptions { CostUnitSeconds = 1.0m });
             var policyEngine = new StaticPolicyEngine(TimeSpan.FromSeconds(1));
             var slowClient = new SlowPolicyServiceClient();
             var reporter = new SidecarMetricsReporter(
@@ -68,7 +68,7 @@ namespace Pyrope.GarnetServer.Tests.Services
 
             var metrics = new MetricsCollector();
             var systemUsageProvider = new TestSystemUsageProvider();
-            var billingMeter = new BillingMeter(new BillingOptions { CostUnitSeconds = 1.0 });
+            var billingMeter = new BillingMeter(new BillingOptions { CostUnitSeconds = 1.0m });
             var policyEngine = new StaticPolicyEngine(TimeSpan.FromSeconds(1));
             var client = new CapturingPolicyServiceClient();
             var reporter = new SidecarMetricsReporter(

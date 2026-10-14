@@ -1,4 +1,4 @@
-﻿using Garnet;
+using Garnet;
 using Garnet.server;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,7 +67,7 @@ namespace Pyrope.GarnetServer
             // --- Billing/Metering (P7) ---
             builder.Services.Configure<BillingOptions>(options =>
             {
-                if (double.TryParse(builder.Configuration["Billing:CostUnitSeconds"], out var costSeconds))
+                if (decimal.TryParse(builder.Configuration["Billing:CostUnitSeconds"], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var costSeconds))
                 {
                     options.CostUnitSeconds = costSeconds;
                 }

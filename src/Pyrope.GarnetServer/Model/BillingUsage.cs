@@ -7,8 +7,8 @@ namespace Pyrope.GarnetServer.Model
         long RequestsTotal,
         long CacheHits,
         long CacheMisses,
-        double ComputeCostUnits,
-        double ComputeSeconds,
+        decimal ComputeCostUnits,
+        decimal ComputeSeconds,
         long VectorStorageBytes,
         long SnapshotStorageBytes,
         DateTimeOffset UpdatedAt);

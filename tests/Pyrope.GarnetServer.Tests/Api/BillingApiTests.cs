@@ -23,7 +23,7 @@ namespace Pyrope.GarnetServer.Tests.Api
 
         public BillingApiTests(WebApplicationFactory<Program> factory)
         {
-            _meter = new BillingMeter(new BillingOptions { CostUnitSeconds = 2.0 });
+            _meter = new BillingMeter(new BillingOptions { CostUnitSeconds = 2.0m });
             _cacheUsage = new TestCacheUsageProvider();
 
             var testFactory = factory.WithWebHostBuilder(builder =>

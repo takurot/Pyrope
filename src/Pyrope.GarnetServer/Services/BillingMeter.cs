@@ -45,10 +45,10 @@ namespace Pyrope.GarnetServer.Services
             MaybeLog(tenantId, state, now);
         }
 
-        public void RecordCompute(string tenantId, double costUnits)
+        public void RecordCompute(string tenantId, decimal costUnits)
         {
             if (string.IsNullOrWhiteSpace(tenantId)) return;
-            if (costUnits <= 0) return;
+            if (costUnits <= 0m) return;
 
             var state = _usage.GetOrAdd(tenantId, _ => new TenantUsageState());
             var now = GetNow();
@@ -62,6 +62,12 @@ namespace Pyrope.GarnetServer.Services
             }
 
             MaybeLog(tenantId, state, now);
+        }
+
+        public void RecordCompute(string tenantId, double costUnits)
+        {
+            if (double.IsNaN(costUnits) || double.IsInfinity(costUnits) || costUnits <= 0) return;
+            RecordCompute(tenantId, (decimal)costUnits);
         }
 
         public void RecordVectorBytes(string tenantId, long deltaBytes)
@@ -271,8 +277,8 @@ namespace Pyrope.GarnetServer.Services
             public long RequestsTotal { get; set; }
             public long CacheHits { get; set; }
             public long CacheMisses { get; set; }
-            public double ComputeCostUnits { get; set; }
-            public double ComputeSeconds { get; set; }
+            public decimal ComputeCostUnits { get; set; }
+            public decimal ComputeSeconds { get; set; }
             public long VectorStorageBytes { get; set; }
             public long SnapshotStorageBytes { get; set; }
             public DateTimeOffset UpdatedAt { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 
@@ -10,6 +11,7 @@ namespace Pyrope.GarnetServer.Services
         private long _cacheMisses;
         private long _evictions;
         private long _aiFallbacks;
+        private double _latencySumMs;
 
         // Simple latency buckets (count)
         // <1ms, <5ms, <10ms, <50ms, <100ms, >100ms
@@ -39,6 +41,8 @@ namespace Pyrope.GarnetServer.Services
         public void RecordSearchLatency(TimeSpan duration)
         {
             var ms = duration.TotalMilliseconds;
+            if (double.IsNaN(ms) || double.IsInfinity(ms) || ms < 0) return;
+
             int bucketIndex;
 
             if (ms < 1) bucketIndex = 0;
@@ -49,6 +53,13 @@ namespace Pyrope.GarnetServer.Services
             else bucketIndex = 5;
 
             Interlocked.Increment(ref _latencyBuckets[bucketIndex]);
+
+            double initial, computed;
+            do
+            {
+                initial = Volatile.Read(ref _latencySumMs);
+                computed = initial + ms;
+            } while (Interlocked.CompareExchange(ref _latencySumMs, computed, initial) != initial);
         }
 
         public string GetStats()
@@ -94,7 +105,7 @@ namespace Pyrope.GarnetServer.Services
             sb.AppendLine($"vector_search_latency_ms_bucket{{le=\"+Inf\"}} {count}");
 
             sb.AppendLine($"vector_search_latency_ms_count {count}");
-            sb.AppendLine($"vector_search_latency_ms_sum 0"); // Sum not implemented yet
+            sb.AppendLine($"vector_search_latency_ms_sum {Volatile.Read(ref _latencySumMs).ToString(CultureInfo.InvariantCulture)}");
 
             return sb.ToString();
         }
@@ -125,6 +136,7 @@ namespace Pyrope.GarnetServer.Services
             {
                 Interlocked.Exchange(ref _latencyBuckets[i], 0);
             }
+            Interlocked.Exchange(ref _latencySumMs, 0.0);
         }
     }
 }

@@ -24,6 +24,7 @@ namespace Pyrope.GarnetServer.Services
         public BillingLogStore(IOptions<BillingOptions> options)
         {
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+            LoadInitialState();
         }
 
         public BillingLogEntry AppendSnapshot(TenantBillingUsage usage, DateTimeOffset timestamp)
@@ -115,10 +116,18 @@ namespace Pyrope.GarnetServer.Services
             {
                 entries = state.Entries.ToArray();
             }
-            var prevHash = GenesisHash;
+
+            if (entries.Length == 0) return true;
+
+            var prevHash = entries[0].PrevHash;
 
             foreach (var entry in entries)
             {
+                if (!string.Equals(entry.PrevHash, prevHash, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
                 var payload = BuildPayload(
                     entry.Timestamp,
                     entry.TenantId,
@@ -148,8 +157,8 @@ namespace Pyrope.GarnetServer.Services
             long requestsTotal,
             long cacheHits,
             long cacheMisses,
-            double computeCostUnits,
-            double computeSeconds,
+            decimal computeCostUnits,
+            decimal computeSeconds,
             long vectorStorageBytes,
             long snapshotStorageBytes)
         {
@@ -160,8 +169,8 @@ namespace Pyrope.GarnetServer.Services
                 requestsTotal.ToString(CultureInfo.InvariantCulture),
                 cacheHits.ToString(CultureInfo.InvariantCulture),
                 cacheMisses.ToString(CultureInfo.InvariantCulture),
-                computeCostUnits.ToString("G17", CultureInfo.InvariantCulture),
-                computeSeconds.ToString("G17", CultureInfo.InvariantCulture),
+                computeCostUnits.ToString(CultureInfo.InvariantCulture),
+                computeSeconds.ToString(CultureInfo.InvariantCulture),
                 vectorStorageBytes.ToString(CultureInfo.InvariantCulture),
                 snapshotStorageBytes.ToString(CultureInfo.InvariantCulture)
             });
@@ -217,6 +226,56 @@ namespace Pyrope.GarnetServer.Services
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[BillingLogStore] Failed to persist entry: {ex.Message}");
+            }
+        }
+
+        private void LoadInitialState()
+        {
+            if (string.IsNullOrWhiteSpace(_options.LogPath)) return;
+
+            try
+            {
+                lock (_fileLock)
+                {
+                    if (!File.Exists(_options.LogPath)) return;
+
+                    using var stream = new FileStream(_options.LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(stream, Encoding.UTF8);
+
+                    string? line;
+                    var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        try
+                        {
+                            var entry = JsonSerializer.Deserialize<BillingLogEntry>(line, jsonOptions);
+                            if (entry == null || string.IsNullOrWhiteSpace(entry.TenantId)) continue;
+
+                            var state = _states.GetOrAdd(entry.TenantId, _ => new TenantLogState());
+                            lock (state.Sync)
+                            {
+                                state.Entries.Enqueue(entry);
+                                state.LastHash = entry.Hash;
+
+                                while (state.Entries.Count > _options.MaxInMemoryEntries)
+                                {
+                                    state.Entries.TryDequeue(out _);
+                                }
+                            }
+                        }
+                        catch (JsonException)
+                        {
+                            // Skip corrupted line gracefully
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[BillingLogStore] Failed to load initial state: {ex.Message}");
             }
         }
 

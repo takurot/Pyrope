@@ -40,6 +40,19 @@ namespace Pyrope.GarnetServer.Tests.Services
             Assert.Contains("vector_search_latency_ms_bucket{le=\"5\"} 2", stats);
             Assert.Contains("vector_search_latency_ms_bucket{le=\"+Inf\"} 3", stats);
             Assert.Contains("vector_search_latency_ms_bucket{le=\"50\"} 2", stats);
+            Assert.Contains("vector_search_latency_ms_sum 154.5", stats);
+        }
+
+        [Fact]
+        public void RecordLatency_ShouldAccumulateSumAcrossMultipleCalls()
+        {
+            var collector = new MetricsCollector();
+
+            collector.RecordSearchLatency(TimeSpan.FromMilliseconds(1.5));
+            collector.RecordSearchLatency(TimeSpan.FromMilliseconds(2.5));
+
+            var stats = collector.GetStats();
+            Assert.Contains("vector_search_latency_ms_sum 4", stats);
         }
 
         [Fact]
@@ -47,11 +60,13 @@ namespace Pyrope.GarnetServer.Tests.Services
         {
             var collector = new MetricsCollector();
             collector.RecordCacheHit();
+            collector.RecordSearchLatency(TimeSpan.FromMilliseconds(10));
 
             collector.Reset();
 
             var stats = collector.GetStats();
             Assert.Contains("cache_hit_total 0", stats);
+            Assert.Contains("vector_search_latency_ms_sum 0", stats);
         }
 
         [Fact]
