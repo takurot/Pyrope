@@ -225,6 +225,15 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#61] IvfPqVectorIndex silent data-loss and correctness defects:
+  - Enabled post-build `Delete()` by removing vectors from `_buffer`, `_rawVectors`, and `_invertedLists`.
+  - Guaranteed `Rebuild` persistence by maintaining canonical raw vectors in `_rawVectors` across `Build()` cycles.
+  - Corrected ADC ranking per metric: L2 (`-distSq`), InnerProduct (`coarseDot + dotResidual`), and Cosine (normalized by `queryNorm * entry.Norm`, clamped to `[-1, 1]`), fully compatible with buffer exact scores.
+  - Hoisted `ComputeInnerProductTable` outside cluster loops and coarse dot products outside entry loops for query performance.
+  - Fixed `GetStats()` to report true indexed vector count under reader-writer lock.
+  - Implemented `IDisposable` on `IvfPqVectorIndex` to cleanly dispose `ReaderWriterLockSlim`.
+  - Added cyclical padding in `ProductQuantizer.Train` when training vectors $< K$ to prevent `IndexOutOfRangeException`.
+  - Hardened input validations across `IvfPqVectorIndex`, `ProductQuantizer`, and `KMeansUtils` (using `float.NegativeInfinity` sentinel in `FindNearestCentroid`).
 - Fixed [#60] BillingLogStore chain integrity broken + float precision loss:
   - Repaired `BillingLogStore.VerifyChain` by anchoring from `entries[0].PrevHash` instead of `GenesisHash`, preventing false tampering alerts when entries are trimmed by `MaxInMemoryEntries`.
   - Added `LoadInitialState()` to restore `LastHash` and in-memory queue from disk on process restart with corrupt-line resilience and non-locking read access.
