@@ -76,30 +76,7 @@ namespace Pyrope.GarnetServer.Extensions
                     {
                         ClientCertificates = new X509CertificateCollection { clientCert },
                         RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) =>
-                        {
-                            if (caCert == null) return sslPolicyErrors == SslPolicyErrors.None;
-                            if (certificate == null) return false;
-
-                            if (skipServerNameValidation)
-                            {
-                                sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;
-                            }
-
-                            try
-                            {
-                                using var customChain = new X509Chain();
-                                customChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-                                customChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-                                customChain.ChainPolicy.CustomTrustStore.Add(caCert);
-
-                                var serverCert = new X509Certificate2(certificate);
-                                return customChain.Build(serverCert);
-                            }
-                            catch
-                            {
-                                return false;
-                            }
-                        }
+                            ValidateRemoteCertificate(certificate, sslPolicyErrors, caCert, skipServerNameValidation)
                     };
                 }
 
@@ -108,6 +85,48 @@ namespace Pyrope.GarnetServer.Extensions
             });
 
             return services;
+        }
+
+        internal static bool ValidateRemoteCertificate(
+            X509Certificate? certificate,
+            SslPolicyErrors sslPolicyErrors,
+            X509Certificate2? caCert,
+            bool skipServerNameValidation)
+        {
+            if (certificate == null)
+            {
+                return false;
+            }
+
+            if ((sslPolicyErrors & SslPolicyErrors.RemoteCertificateNotAvailable) != 0)
+            {
+                return false;
+            }
+
+            if (caCert == null)
+            {
+                return sslPolicyErrors == SslPolicyErrors.None;
+            }
+
+            if (!skipServerNameValidation && (sslPolicyErrors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                using var customChain = new X509Chain();
+                customChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                customChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+                customChain.ChainPolicy.CustomTrustStore.Add(caCert);
+
+                using var serverCert = new X509Certificate2(certificate);
+                return customChain.Build(serverCert);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
