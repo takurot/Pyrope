@@ -9,8 +9,11 @@ namespace Pyrope.GarnetServer.Vector
     {
         public static List<float[]> Train(List<float[]> data, int k, int dimension, VectorMetric metric, int maxIter = 10, int? seed = null)
         {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (dimension <= 0) throw new ArgumentOutOfRangeException(nameof(dimension), "Dimension must be positive");
+            if (k <= 0) throw new ArgumentOutOfRangeException(nameof(k), "k must be positive");
+
             if (data.Count == 0) return new List<float[]>();
-            if (k <= 0) k = 1;
             if (k > data.Count) k = data.Count;
 
             var rnd = seed.HasValue ? new Random(seed.Value) : new Random();
@@ -69,17 +72,25 @@ namespace Pyrope.GarnetServer.Vector
 
         public static int FindNearestCentroid(float[] vec, List<float[]> centroids, List<float> centroidNorms, VectorMetric metric)
         {
+            if (vec == null) throw new ArgumentNullException(nameof(vec));
+            if (centroids == null || centroids.Count == 0) throw new ArgumentException("Centroids cannot be null or empty", nameof(centroids));
+            if (centroids[0] != null && vec.Length != centroids[0].Length) throw new ArgumentException("Vector dimension mismatch", nameof(vec));
+
             int bestIndex = 0;
-            float bestScore = float.MinValue;
+            float bestScore = float.NegativeInfinity;
             float vecNorm = metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(vec) : 0f;
 
             for (int i = 0; i < centroids.Count; i++)
             {
+                float cNorm = (centroidNorms != null && i < centroidNorms.Count)
+                    ? centroidNorms[i]
+                    : (metric == VectorMetric.Cosine ? VectorMath.ComputeNorm(centroids[i]) : 0f);
+
                 float score = metric switch
                 {
                     VectorMetric.L2 => -VectorMath.L2Squared(vec, centroids[i]),
                     VectorMetric.InnerProduct => VectorMath.DotProduct(vec, centroids[i]),
-                    VectorMetric.Cosine => VectorMath.Cosine(vec, centroids[i], vecNorm, centroidNorms[i]),
+                    VectorMetric.Cosine => VectorMath.Cosine(vec, centroids[i], vecNorm, cNorm),
                     _ => 0f
                 };
 
