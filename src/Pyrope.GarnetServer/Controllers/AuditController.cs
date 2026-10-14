@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Pyrope.GarnetServer.Security;
 using Pyrope.GarnetServer.Services;
+using Pyrope.GarnetServer.Utils;
 
 namespace Pyrope.GarnetServer.Controllers
 {
@@ -29,6 +30,28 @@ namespace Pyrope.GarnetServer.Controllers
             [FromQuery] string? action = null,
             [FromQuery] int limit = 100)
         {
+            if (!string.IsNullOrWhiteSpace(tenantId) && !TenantNamespace.TryValidateTenantId(tenantId, out var error))
+            {
+                return BadRequest(error);
+            }
+
+            var isAdmin = IsAdmin();
+            var contextTenantId = GetCallerTenantId();
+
+            if (!isAdmin)
+            {
+                if (string.IsNullOrWhiteSpace(tenantId))
+                {
+                    tenantId = contextTenantId;
+                }
+
+                if (string.IsNullOrWhiteSpace(tenantId) ||
+                    (!string.IsNullOrWhiteSpace(contextTenantId) && !string.Equals(tenantId, contextTenantId, StringComparison.Ordinal)))
+                {
+                    return Forbid();
+                }
+            }
+
             if (limit < 1) limit = 1;
             if (limit > 1000) limit = 1000;
 
@@ -78,14 +101,40 @@ namespace Pyrope.GarnetServer.Controllers
         /// </summary>
         [HttpGet("stats")]
         [RequirePermission(Permission.AuditRead)]
-        public IActionResult GetStats()
+        public IActionResult GetStats([FromQuery] string? tenantId = null)
         {
+            if (!string.IsNullOrWhiteSpace(tenantId) && !TenantNamespace.TryValidateTenantId(tenantId, out var error))
+            {
+                return BadRequest(error);
+            }
+
+            var isAdmin = IsAdmin();
+            var contextTenantId = GetCallerTenantId();
+
+            if (!isAdmin)
+            {
+                if (string.IsNullOrWhiteSpace(tenantId))
+                {
+                    tenantId = contextTenantId;
+                }
+
+                if (string.IsNullOrWhiteSpace(tenantId) ||
+                    (!string.IsNullOrWhiteSpace(contextTenantId) && !string.Equals(tenantId, contextTenantId, StringComparison.Ordinal)))
+                {
+                    return Forbid();
+                }
+            }
+
             return Ok(new
             {
-                TotalEvents = _auditLogger.Count
+                TotalEvents = _auditLogger.GetCount(tenantId)
             });
         }
 
-        private string? GetCurrentUserId() => HttpContext?.Items["PyropeUserId"]?.ToString();
+        private bool IsAdmin() =>
+            HttpContext?.Items.TryGetValue("IsAdmin", out var obj) == true && obj is bool admin && admin;
+
+        private string? GetCallerTenantId() =>
+            HttpContext?.Items["PyropeTenantId"]?.ToString();
     }
 }
