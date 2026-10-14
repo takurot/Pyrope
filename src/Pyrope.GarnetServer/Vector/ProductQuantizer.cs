@@ -15,8 +15,11 @@ namespace Pyrope.GarnetServer.Vector
 
         public ProductQuantizer(int dim, int m, int k)
         {
-            if (dim % m != 0) throw new ArgumentException("Dimension must be divisible by M");
-            if (k > 256) throw new ArgumentException("K must be <= 256 for byte encoding");
+            if (dim <= 0) throw new ArgumentOutOfRangeException(nameof(dim), "Dimension must be positive");
+            if (m <= 0) throw new ArgumentOutOfRangeException(nameof(m), "M must be positive");
+            if (k <= 0) throw new ArgumentOutOfRangeException(nameof(k), "K must be positive");
+            if (k > 256) throw new ArgumentOutOfRangeException(nameof(k), "K must be <= 256 for byte encoding");
+            if (dim % m != 0) throw new ArgumentException("Dimension must be divisible by M", nameof(dim));
 
             Dim = dim;
             M = m;
@@ -27,14 +30,18 @@ namespace Pyrope.GarnetServer.Vector
 
         public void Train(float[][] data)
         {
+            if (data == null) throw new ArgumentNullException(nameof(data));
             if (data.Length == 0) return;
 
-            // Train K-Means for each subspace
-            // Parallelize across subspaces? Yes.
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] == null || data[i].Length != Dim)
+                    throw new ArgumentException($"Training vector at index {i} has invalid dimension", nameof(data));
+            }
 
+            // Train K-Means for each subspace in parallel
             System.Threading.Tasks.Parallel.For(0, M, mIdx =>
             {
-                // Extract sub-vectors
                 var subData = new System.Collections.Generic.List<float[]>(data.Length);
                 for (int i = 0; i < data.Length; i++)
                 {
@@ -43,15 +50,25 @@ namespace Pyrope.GarnetServer.Vector
                     subData.Add(subVec);
                 }
 
-                // Train
-                // Note: PQ typically uses L2 for subspace quantization even if global metric is Cosine?
-                // Actually, minimizing L2 in subspace minimizes L2 in full space.
-                // For Cosine, usually vectors are normalized, and L2 approx is fine.
                 var trained = KMeansUtils.Train(subData, K, SubDim, VectorMetric.L2, maxIter: 10, seed: 42 + mIdx);
 
-                // Ensure we have exactly K centroids (fill with zeros or duplicates if not enough data)
-                // KMeansUtils returns simpler list.
-                _centroids[mIdx] = trained.ToArray();
+                // Ensure exactly K centroids (pad with duplicates or zeros if trained.Count < K)
+                var subspaceCentroids = new float[K][];
+                if (trained.Count == 0)
+                {
+                    for (int kIdx = 0; kIdx < K; kIdx++)
+                        subspaceCentroids[kIdx] = new float[SubDim];
+                }
+                else
+                {
+                    for (int kIdx = 0; kIdx < K; kIdx++)
+                    {
+                        var source = trained[kIdx % trained.Count];
+                        subspaceCentroids[kIdx] = (float[])source.Clone();
+                    }
+                }
+
+                _centroids[mIdx] = subspaceCentroids;
             });
 
             _isTrained = true;
@@ -60,15 +77,14 @@ namespace Pyrope.GarnetServer.Vector
         public byte[] Encode(float[] vector)
         {
             if (!_isTrained) throw new InvalidOperationException("PQ not trained");
-            if (vector.Length != Dim) throw new ArgumentException("Vector dimension mismatch");
+            if (vector == null) throw new ArgumentNullException(nameof(vector));
+            if (vector.Length != Dim) throw new ArgumentException("Vector dimension mismatch", nameof(vector));
 
             var codes = new byte[M];
 
             // For each subspace
             for (int mIdx = 0; mIdx < M; mIdx++)
             {
-                // Extract sub-vector (optimization: use Span/ArraySegment logic inside FindNearest)
-                // Ideally prevent allow alloc. For now, Alloc is safest.
                 var subVec = new float[SubDim];
                 Array.Copy(vector, mIdx * SubDim, subVec, 0, SubDim);
 
@@ -82,7 +98,8 @@ namespace Pyrope.GarnetServer.Vector
         public float[] Decode(byte[] code)
         {
             if (!_isTrained) throw new InvalidOperationException("PQ not trained");
-            if (code.Length != M) throw new ArgumentException("Code length mismatch");
+            if (code == null) throw new ArgumentNullException(nameof(code));
+            if (code.Length != M) throw new ArgumentException("Code length mismatch", nameof(code));
 
             var vec = new float[Dim];
             for (int mIdx = 0; mIdx < M; mIdx++)
@@ -98,6 +115,8 @@ namespace Pyrope.GarnetServer.Vector
         public float[][] ComputeDistanceTable(float[] query)
         {
             if (!_isTrained) throw new InvalidOperationException("PQ not trained");
+            if (query == null) throw new ArgumentNullException(nameof(query));
+            if (query.Length != Dim) throw new ArgumentException("Query dimension mismatch", nameof(query));
 
             var table = new float[M][];
 
@@ -111,9 +130,31 @@ namespace Pyrope.GarnetServer.Vector
                 var centroids = _centroids[mIdx];
                 for (int k = 0; k < centroids.Length; k++)
                 {
-                    // Subspace distance is always L2 squared usually for PQ ADC
-                    // d(x, y) = sum(d_sub(x_i, y_i))
                     table[mIdx][k] = VectorMath.L2SquaredUnsafe(subQuery, centroids[k]);
+                }
+            }
+            return table;
+        }
+
+        public float[][] ComputeInnerProductTable(float[] query)
+        {
+            if (!_isTrained) throw new InvalidOperationException("PQ not trained");
+            if (query == null) throw new ArgumentNullException(nameof(query));
+            if (query.Length != Dim) throw new ArgumentException("Query dimension mismatch", nameof(query));
+
+            var table = new float[M][];
+
+            // For each subspace
+            for (int mIdx = 0; mIdx < M; mIdx++)
+            {
+                table[mIdx] = new float[_centroids[mIdx].Length];
+                var subQuery = new float[SubDim];
+                Array.Copy(query, mIdx * SubDim, subQuery, 0, SubDim);
+
+                var centroids = _centroids[mIdx];
+                for (int k = 0; k < centroids.Length; k++)
+                {
+                    table[mIdx][k] = VectorMath.DotProduct(subQuery, centroids[k]);
                 }
             }
             return table;
