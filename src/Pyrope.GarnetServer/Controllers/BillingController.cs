@@ -64,8 +64,8 @@ namespace Pyrope.GarnetServer.Controllers
                         0,
                         0,
                         0,
-                        0,
-                        0,
+                        0m,
+                        0m,
                         0,
                         0,
                         DateTimeOffset.UtcNow);
