@@ -49,7 +49,7 @@ namespace Pyrope.GarnetServer.Security
             // Fallback: check legacy tenant-level API key (treated as TenantAdmin for backward compatibility)
             if (_tenantRegistry.TryGet(tenantId, out var tenantConfig) && tenantConfig != null)
             {
-                if (string.Equals(tenantConfig.ApiKey, apiKey, StringComparison.Ordinal))
+                if (SecurityUtils.FixedTimeEquals(tenantConfig.ApiKey, apiKey))
                 {
                     return Role.TenantAdmin;
                 }
@@ -77,7 +77,7 @@ namespace Pyrope.GarnetServer.Security
             // Fallback: legacy tenant API key is treated as "admin" user
             if (_tenantRegistry.TryGet(tenantId, out var tenantConfig) && tenantConfig != null)
             {
-                if (string.Equals(tenantConfig.ApiKey, apiKey, StringComparison.Ordinal))
+                if (SecurityUtils.FixedTimeEquals(tenantConfig.ApiKey, apiKey))
                 {
                     return "admin";
                 }

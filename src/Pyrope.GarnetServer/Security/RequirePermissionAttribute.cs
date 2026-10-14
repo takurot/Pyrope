@@ -1,8 +1,10 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
+using Pyrope.GarnetServer.Utils;
 
 namespace Pyrope.GarnetServer.Security
 {
@@ -51,39 +53,73 @@ namespace Pyrope.GarnetServer.Security
 
             // API Key should be injected into HttpContext.Items by ApiKeyAuthMiddleware
             var apiKey = context.HttpContext.Items["PyropeApiKey"]?.ToString();
-            var tenantId = context.RouteData.Values["tenantId"]?.ToString();
-
             if (string.IsNullOrEmpty(apiKey))
             {
                 context.Result = new UnauthorizedResult();
                 return;
             }
 
-            // If tenantId is not in route, check query string
+            // Extract tenantId strictly from route, query, or body ActionArguments
+            var tenantId = context.RouteData.Values["tenantId"]?.ToString();
             if (string.IsNullOrEmpty(tenantId))
             {
-                tenantId = context.HttpContext.Request.Query["tenantId"].ToString();
+                tenantId = context.RouteData.Values["id"]?.ToString();
             }
 
-            // Note: If tenantId is still missing, it depends on the action. 
-            // If it's a global action, authService needs to handle it.
-            // For now, most actions have a tenantId.
-
-            if (string.IsNullOrEmpty(tenantId))
+            if (string.IsNullOrEmpty(tenantId) && context.HttpContext.Request.Query.TryGetValue("tenantId", out var queryVal))
             {
-                // Search in body for certain requests (e.g. CreateIndex)
-                // But generally we prefer route parameters.
+                tenantId = queryVal.ToString();
             }
 
-            if (!authService.HasPermission(tenantId ?? "system", apiKey, _permission))
+            if (string.IsNullOrEmpty(tenantId) && context.ActionArguments != null)
+            {
+                foreach (var arg in context.ActionArguments.Values)
+                {
+                    if (arg == null) continue;
+                    var prop = arg.GetType().GetProperty("TenantId", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop != null && prop.PropertyType == typeof(string))
+                    {
+                        var val = prop.GetValue(arg) as string;
+                        if (!string.IsNullOrWhiteSpace(val))
+                        {
+                            tenantId = val;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // For non-global-admin callers, fail closed if tenantId is missing
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+
+            // Validate tenantId format
+            if (!TenantNamespace.TryValidateTenantId(tenantId, out _))
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+
+            // Cross-tenant guard: if middleware authenticated a specific tenant, ensure it matches requested tenantId
+            var authenticatedTenantId = context.HttpContext.Items["PyropeTenantId"]?.ToString();
+            if (!string.IsNullOrEmpty(authenticatedTenantId) && !string.Equals(authenticatedTenantId, tenantId, StringComparison.Ordinal))
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+
+            if (!authService.HasPermission(tenantId, apiKey, _permission))
             {
                 context.Result = new ForbidResult();
                 return;
             }
 
             // Store UserId and Role in Items for subsequent use (e.g. Audit Logging)
-            var userId = authService.GetUserId(tenantId ?? "system", apiKey);
-            var role = authService.GetRole(tenantId ?? "system", apiKey);
+            var userId = authService.GetUserId(tenantId, apiKey);
+            var role = authService.GetRole(tenantId, apiKey);
 
             if (userId != null) context.HttpContext.Items["PyropeUserId"] = userId;
             if (role != null) context.HttpContext.Items["PyropeUserRole"] = role.ToString();
