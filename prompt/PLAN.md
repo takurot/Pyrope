@@ -225,6 +225,12 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#60] BillingLogStore chain integrity broken + float precision loss:
+  - Repaired `BillingLogStore.VerifyChain` by anchoring from `entries[0].PrevHash` instead of `GenesisHash`, preventing false tampering alerts when entries are trimmed by `MaxInMemoryEntries`.
+  - Added `LoadInitialState()` to restore `LastHash` and in-memory queue from disk on process restart with corrupt-line resilience and non-locking read access.
+  - Converted financial fields (`ComputeCostUnits`, `ComputeSeconds`, `CostUnitSeconds`) to `decimal` across models and meter.
+  - Hardened `IBillingMeter.RecordCompute` against `double.IsNaN`, `double.IsInfinity`, and negative values.
+  - Exported true query latency sum in `MetricsCollector` via thread-safe atomic CAS loop for Prometheus histograms.
 - Fixed [#59] mTLS hostname validation in SidecarExtensions:
   - Extracted certificate validation logic into `SidecarExtensions.ValidateRemoteCertificate`.
   - Enforced server hostname matching (`RemoteCertificateNameMismatch`) when `skipServerNameValidation` is false.
