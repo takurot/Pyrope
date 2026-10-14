@@ -33,5 +33,10 @@ namespace Pyrope.GarnetServer.Services
         /// Gets the total count of audit events.
         /// </summary>
         int Count { get; }
+
+        /// <summary>
+        /// Gets the count of audit events optionally filtered by tenant ID.
+        /// </summary>
+        int GetCount(string? tenantId = null);
     }
 }

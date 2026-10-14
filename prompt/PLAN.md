@@ -225,6 +225,11 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#58] IDOR: Cross-tenant audit log exposure in AuditController:
+  - Enforced tenant matching between caller context (`PyropeTenantId`) and queried `tenantId` in `AuditController.GetLogs` and `GetStats`, forbidding cross-tenant access.
+  - Implemented `IAuditLogger.GetCount(string? tenantId)` for accurate scoped counts without limit truncation.
+  - Added `TenantNamespace.TryValidateTenantId` format validation returning 400 Bad Request on invalid tenant IDs.
+  - Removed dead code `GetCurrentUserId()`.
 - Fixed [#57] Auth/RBAC Subsystem Hardening:
   - Eliminated fail-open `if (!_options.Enabled) return true;` in `TenantApiKeyAuthenticator`.
   - Added constant-time API key comparisons (`SecurityUtils.FixedTimeEquals`) to eliminate timing side-channels in `RbacAuthorizationService`, `TenantApiKeyAuthenticator`, and `ApiKeyAuthMiddleware`.

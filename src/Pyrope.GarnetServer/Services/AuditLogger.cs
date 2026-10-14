@@ -35,6 +35,17 @@ namespace Pyrope.GarnetServer.Services
         public int Count => _eventCount;
 
         /// <inheritdoc/>
+        public int GetCount(string? tenantId = null)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                return _eventCount;
+            }
+
+            return _events.Count(e => string.Equals(e.TenantId, tenantId, StringComparison.Ordinal));
+        }
+
+        /// <inheritdoc/>
         public void Log(AuditEvent evt)
         {
             if (evt == null) throw new ArgumentNullException(nameof(evt));
