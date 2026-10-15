@@ -106,7 +106,7 @@ namespace Pyrope.GarnetServer.Model
             }
         }
 
-        public void Set(QueryKey key, string resultJson, TimeSpan? ttl = null)
+        public bool Set(QueryKey key, string resultJson, TimeSpan? ttl = null)
         {
             var currentEpoch = _indexRegistry.GetEpoch(key.TenantId, key.IndexName);
             var itemDto = new CachedItemDto
@@ -119,7 +119,7 @@ namespace Pyrope.GarnetServer.Model
             var data = JsonSerializer.SerializeToUtf8Bytes(itemDto, _jsonOptions);
             var storageKey = GetStorageKey(key);
 
-            _storage.Set(storageKey, data, ttl);
+            return _storage.Set(storageKey, data, ttl);
         }
 
         private static string GetStorageKey(QueryKey key)
