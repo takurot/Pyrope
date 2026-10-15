@@ -31,10 +31,11 @@ namespace Pyrope.GarnetServer.Tests.Model
                 return false;
             }
 
-            public void Set(string key, byte[] value, TimeSpan? ttl = null)
+            public bool Set(string key, byte[] value, TimeSpan? ttl = null)
             {
                 DateTime? expiry = ttl.HasValue ? DateTime.UtcNow.Add(ttl.Value) : null;
                 Store[key] = (value, expiry);
+                return true;
             }
         }
 

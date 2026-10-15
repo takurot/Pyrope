@@ -4,5 +4,6 @@ namespace Pyrope.GarnetServer.Model
     {
         int Clear();
         int RemoveByPrefix(string prefix);
+        int PurgeExpired();
     }
 }
