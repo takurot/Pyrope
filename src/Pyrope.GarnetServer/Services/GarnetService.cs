@@ -1,11 +1,16 @@
-using Microsoft.Extensions.Hosting;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Garnet;
 using Garnet.server;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Pyrope.GarnetServer.DataModel;
 using Pyrope.GarnetServer.Extensions;
 using Pyrope.GarnetServer.Model;
 using Pyrope.GarnetServer.Policies;
 using Pyrope.GarnetServer.Security;
-using Pyrope.GarnetServer.DataModel;
 
 namespace Pyrope.GarnetServer.Services
 {
@@ -23,8 +28,11 @@ namespace Pyrope.GarnetServer.Services
         private readonly CanonicalKeyMap _canonicalKeyMap;
         private readonly IPredictivePrefetcher _prefetcher;
         private readonly IPrefetchBackgroundQueue _prefetchQueue;
-        private readonly ILogger<GarnetService> _logger;
         private readonly IBillingMeter _billingMeter;
+        private readonly ILogger<GarnetService> _logger;
+
+        private volatile bool _disposed;
+        private readonly object _disposeLock = new();
 
         public GarnetService(
             ResultCache resultCache,
@@ -33,7 +41,6 @@ namespace Pyrope.GarnetServer.Services
             LshService lshService,
             ITenantQuotaEnforcer quotaEnforcer,
             ITenantAuthenticator tenantAuthenticator,
-
             ISloGuardrails sloGuardrails,
             SemanticClusterRegistry clusterRegistry,
             CanonicalKeyMap canonicalKeyMap,
@@ -43,6 +50,20 @@ namespace Pyrope.GarnetServer.Services
             ILogger<GarnetService> logger,
             string[]? args = null)
         {
+            ArgumentNullException.ThrowIfNull(resultCache);
+            ArgumentNullException.ThrowIfNull(policyEngine);
+            ArgumentNullException.ThrowIfNull(metricsCollector);
+            ArgumentNullException.ThrowIfNull(lshService);
+            ArgumentNullException.ThrowIfNull(quotaEnforcer);
+            ArgumentNullException.ThrowIfNull(tenantAuthenticator);
+            ArgumentNullException.ThrowIfNull(sloGuardrails);
+            ArgumentNullException.ThrowIfNull(clusterRegistry);
+            ArgumentNullException.ThrowIfNull(canonicalKeyMap);
+            ArgumentNullException.ThrowIfNull(prefetcher);
+            ArgumentNullException.ThrowIfNull(prefetchQueue);
+            ArgumentNullException.ThrowIfNull(billingMeter);
+            ArgumentNullException.ThrowIfNull(logger);
+
             _resultCache = resultCache;
             _policyEngine = policyEngine;
             _metricsCollector = metricsCollector;
@@ -56,6 +77,7 @@ namespace Pyrope.GarnetServer.Services
             _prefetchQueue = prefetchQueue;
             _billingMeter = billingMeter;
             _logger = logger;
+
             // Filter out ASP.NET Core specific arguments before passing to Garnet
             var garnetArgs = (args ?? Array.Empty<string>())
                 .Where(arg => !arg.StartsWith("--urls", StringComparison.OrdinalIgnoreCase))
@@ -73,34 +95,57 @@ namespace Pyrope.GarnetServer.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Warning] Garnet failed to start: {ex.Message}");
+                _logger.LogError(ex, "Garnet failed to start: {Message}", ex.Message);
+                throw;
             }
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _server.Dispose();
+            Dispose();
             return Task.CompletedTask;
         }
 
         public void Dispose()
         {
-            _server.Dispose();
+            if (_disposed) return;
+            lock (_disposeLock)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _server?.Dispose();
+            }
+            GC.SuppressFinalize(this);
+        }
+
+        internal VectorCommandSet CreateCommandSet(VectorCommandType commandType)
+        {
+            return new VectorCommandSet(
+                commandType: commandType,
+                resultCache: _resultCache,
+                policyEngine: _policyEngine,
+                metrics: _metricsCollector,
+                lshService: _lshService,
+                quotaEnforcer: _quotaEnforcer,
+                tenantAuthenticator: _tenantAuthenticator,
+                sloGuardrails: _sloGuardrails,
+                clusterRegistry: _clusterRegistry,
+                canonicalKeyMap: _canonicalKeyMap,
+                prefetcher: _prefetcher,
+                prefetchQueue: _prefetchQueue,
+                logger: _logger,
+                billingMeter: _billingMeter
+            );
         }
 
         private void RegisterCommands()
         {
-            // Register Custom Commands
-            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Add, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
-            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Upsert, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
-            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, new VectorCommandSet(VectorCommandType.Del, null, null, null, null, _quotaEnforcer, _tenantAuthenticator, billingMeter: _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
-
-            // VEC.SEARCH with Caching & Policy & Metrics & LSH & Semantic Clustering & Canonical Aliasing
-            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, new VectorCommandSet(VectorCommandType.Search, _resultCache, _policyEngine, _metricsCollector, _lshService, _quotaEnforcer, _tenantAuthenticator, _sloGuardrails, _clusterRegistry, _canonicalKeyMap, _prefetcher, _prefetchQueue, _logger, _billingMeter), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
-
-            // VEC.STATS
-            _server.Register.NewCommand("VEC.STATS", CommandType.Read, new VectorCommandSet(VectorCommandType.Stats, null, null, _metricsCollector, null, null, _tenantAuthenticator), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });
+            _server.Register.NewCommand("VEC.ADD", CommandType.ReadModifyWrite, CreateCommandSet(VectorCommandType.Add), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_ADD, Name = "VEC.ADD" });
+            _server.Register.NewCommand("VEC.UPSERT", CommandType.ReadModifyWrite, CreateCommandSet(VectorCommandType.Upsert), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_UPSERT, Name = "VEC.UPSERT" });
+            _server.Register.NewCommand("VEC.DEL", CommandType.ReadModifyWrite, CreateCommandSet(VectorCommandType.Del), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_DEL, Name = "VEC.DEL" });
+            _server.Register.NewCommand("VEC.SEARCH", CommandType.Read, CreateCommandSet(VectorCommandType.Search), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_SEARCH, Name = "VEC.SEARCH" });
+            _server.Register.NewCommand("VEC.STATS", CommandType.Read, CreateCommandSet(VectorCommandType.Stats), new RespCommandsInfo { Command = (RespCommand)VectorCommandSet.VEC_STATS, Name = "VEC.STATS" });
         }
     }
 }
