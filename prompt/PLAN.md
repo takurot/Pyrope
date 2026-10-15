@@ -225,6 +225,12 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#63] MemoryCacheStorage races, stale usage accounting, and exposed internal buffers:
+  - Eliminated expired entry removal race condition in `TryGet` / `RemoveEntry` using reference check `ReferenceEquals(current, expectedEntry)` and CAS removal on `_store` via `ICollection<KeyValuePair<string, CacheEntry>>.Remove`, preventing newly overwritten entries from being deleted concurrently.
+  - Updated `ICacheStorage.Set` and `ResultCache.Set` to return `bool` indicating whether the cache write succeeded or was rejected due to quota limit or invalid arguments.
+  - Implemented proactive expired entry pruning (`PruneExpiredForTenant`) in `Set` and `GetTenantUsageBytes` with double-subtraction guards, preventing unread expired entries from permanently inflating tenant memory usage.
+  - Implemented `ICacheAdmin.PurgeExpired()` to proactively sweep expired cache entries across all tenants.
+  - Defensively cloned `byte[]` payloads upon insertion (`Set`) and retrieval (`TryGet`) to prevent buffer mutations from affecting internal cache state.
 - Fixed [#62] GarnetService lifecycle, double-dispose, and missing command dependencies:
   - Eliminated swallowed startup exceptions in `GarnetService.StartAsync`, logging errors with `_logger.LogError` and rethrowing so .NET Generic Host fails fast.
   - Implemented thread-safe, idempotent single disposal using `private volatile bool _disposed` and double-checked locking with `_disposeLock`, delegating `StopAsync` to `Dispose()`.
