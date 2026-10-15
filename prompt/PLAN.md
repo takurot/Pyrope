@@ -225,6 +225,11 @@ Tasks are designed to be PR-sized units (1-3 days work) and allow parallel execu
 
 ## Current
 
+- Fixed [#62] GarnetService lifecycle, double-dispose, and missing command dependencies:
+  - Eliminated swallowed startup exceptions in `GarnetService.StartAsync`, logging errors with `_logger.LogError` and rethrowing so .NET Generic Host fails fast.
+  - Implemented thread-safe, idempotent single disposal using `private volatile bool _disposed` and double-checked locking with `_disposeLock`, delegating `StopAsync` to `Dispose()`.
+  - Added `ArgumentNullException.ThrowIfNull` validation for all 13 constructor dependencies in `GarnetService`.
+  - Injected complete dependencies to all command handlers (`VEC.ADD`, `VEC.UPSERT`, `VEC.DEL`, `VEC.SEARCH`, `VEC.STATS`) using named arguments via `CreateCommandSet(VectorCommandType)`, resolving null dependency defects including `ClusterRegistry` write heat tracking (`RecordWrite`).
 - Fixed [#61] IvfPqVectorIndex silent data-loss and correctness defects:
   - Enabled post-build `Delete()` by removing vectors from `_buffer`, `_rawVectors`, and `_invertedLists`.
   - Guaranteed `Rebuild` persistence by maintaining canonical raw vectors in `_rawVectors` across `Build()` cycles.
