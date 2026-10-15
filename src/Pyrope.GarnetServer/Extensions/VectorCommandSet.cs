@@ -77,6 +77,11 @@ namespace Pyrope.GarnetServer.Extensions
             _billingMeter = billingMeter;
         }
 
+        internal SemanticClusterRegistry? ClusterRegistry => _clusterRegistry;
+        internal ILogger? Logger => _logger;
+        internal IMetricsCollector? Metrics => _metrics;
+        internal IBillingMeter? Meter => _billingMeter;
+
         public override bool InitialUpdater(ReadOnlySpan<byte> key, ref RawStringInput input, Span<byte> value, ref RespMemoryWriter output, ref RMWInfo rmwInfo)
             => HandleWrite(key, ref input, ref output);
 
