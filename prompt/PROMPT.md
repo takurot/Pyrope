@@ -1,302 +1,202 @@
 # タスク実行プロンプト
 
 このリポジトリでは `prompt/PLAN.md` と `prompt/SPEC.md` を参照しながら、AIキャッシュ制御型ベクターDB「Pyrope」を実装します。
-開発プロセスは手戻りを防ぎ、仕様整合性と安全性を担保するため、**6ステージ実装フロー（Multi-Stage Autonomous Workflow）** に基づいて進めます。
+タスクは次の順序で完遂してください。**実装やPR作成だけで終了せず、独立したレビューでの承認と最新コミットのCIオールグリーンまで対応します。**
+
+1. 仕様検討・実装計画の策定
+2. サブエージェントによる仕様レビューと改善ループ
+3. TDD実装・ローカル検証
+4. コミット・プッシュ・PR作成
+5. サブエージェントによるPRレビューと改善ループ
+6. CIの監視・修正を継続し、全チェック成功を確認
+
+ユーザーがドキュメント編集のみなど作業範囲を明示した場合は、その範囲を優先します。以下を実装タスクの標準フローとし、ユーザーが明示した範囲制限は優先します。
 
 ---
 
 ## プロジェクト構造
 
-```
+```text
 Pyrope/
-├── src/                          # ソースコード
-│   ├── Pyrope.GarnetServer/      # C# Garnetサーバー（フロントエンド / Fast Path）
-│   ├── Pyrope.Benchmarks/        # ベンチマークCLI
-│   └── Pyrope.AISidecar/         # Python AIサイドカー（Warm Path / gRPC）
-├── tests/                        # テストコード
-│   ├── Pyrope.GarnetServer.Tests/# C# xUnitテスト
+├── src/
+│   ├── Pyrope.GarnetServer/       # C# Garnetサーバー（Fast Path）
+│   ├── Pyrope.Benchmarks/         # ベンチマークCLI
+│   ├── Pyrope.AISidecar/          # Python AIサイドカー（Warm Path / gRPC）
+│   └── Protos/                   # gRPC Proto定義
+├── tests/
+│   ├── Pyrope.GarnetServer.Tests/ # C# xUnitテスト
 │   └── smoke_test.py             # Redisクライアント smoke test
-├── scripts/                      # ユーティリティスクリプト
-│   ├── check_quality.sh          # 品質チェック（ビルド・テスト・lint・format）
-│   ├── bench_vectors.sh          # ベンチマーク実行スクリプト
-│   └── generate_mtls_certs.sh    # mTLS証明書生成スクリプト
-├── prompt/                       # AI向けドキュメント
-│   ├── PROMPT.md                 # 本ファイル（実装ガイドライン・6ステージワークフロー）
-│   ├── PLAN.md                   # 実装ロードマップ・進捗管理
-│   └── SPEC.md                   # 完全機能仕様書
-└── docker-compose.yml            # 開発・mTLS検証環境
+├── scripts/
+│   ├── check_quality.sh          # ローカル品質チェック
+│   ├── bench_vectors.sh          # ベンチマーク
+│   └── generate_mtls_certs.sh     # mTLS証明書生成
+├── prompt/
+│   ├── PROMPT.md                 # 本ワークフロー
+│   ├── PLAN.md                   # 実装ロードマップ・進捗
+│   └── SPEC.md                   # 機能仕様
+└── docker-compose.yml
 ```
 
----
-
-## 6ステージ実装フロー（Multi-Stage Workflow）
-
-すべてのタスク（新機能、バグ修正、リファクタリング、性能改善）は以下の6ステージを経て進めます。
-設計計画とコード差分について独立したレビューゲートを設けることで、仕様齟齬や潜在的な不具合、セキュリティリスクを未然に防ぎます。
+## 6ステージ実装フロー
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Stage1_PLANNING: タスク着手
-    Stage1_PLANNING --> Stage2_PLAN_REVIEW: 実装計画策定完了
-    Stage2_PLAN_REVIEW --> Stage3_IMPLEMENTATION: レビュー判定: APPROVE
-    Stage2_PLAN_REVIEW --> Stage1_PLANNING: レビュー判定: REQUEST_CHANGES (リビジョン < 上限)
-    Stage2_PLAN_REVIEW --> NEEDS_HUMAN: レビュー判定: REQUEST_CHANGES (リビジョン >= 上限)
-    Stage3_IMPLEMENTATION --> Stage4_VERIFYING: TDD実装・ローカル単体テスト完了
-    Stage4_VERIFYING --> Stage5_PR_REVIEW: 全品質ゲートパス (./scripts/check_quality.sh)
-    Stage4_VERIFYING --> Stage3_IMPLEMENTATION: 品質ゲート失敗 (自己修正ループ)
-    Stage5_PR_REVIEW --> Stage6_COMPLETION: レビュー判定: APPROVE
-    Stage5_PR_REVIEW --> Stage6_REVISING: レビュー判定: REQUEST_CHANGES (サイクル < 上限)
-    Stage5_PR_REVIEW --> NEEDS_HUMAN: レビュー判定: REQUEST_CHANGES (サイクル >= 上限)
-    Stage6_REVISING --> Stage4_VERIFYING: 指摘対応完了 (再検証へ)
-    Stage6_COMPLETION --> [*]: PR作成 & CIパス確認完了
+    [*] --> SPEC_PLANNING
+    SPEC_PLANNING --> SPEC_REVIEW: 仕様・受け入れ条件・計画を提示
+    SPEC_REVIEW --> SPEC_PLANNING: REQUEST_CHANGES・改訂して再レビュー
+    SPEC_REVIEW --> TDD_IMPLEMENTATION: APPROVE
+    TDD_IMPLEMENTATION --> TDD_IMPLEMENTATION: Red → Green → Refactor・品質検証
+    TDD_IMPLEMENTATION --> PR_CREATION: ローカル検証成功
+    PR_CREATION --> PR_REVIEW: コミット・プッシュ・PR作成済み
+    PR_REVIEW --> TDD_IMPLEMENTATION: REQUEST_CHANGES・修正と再検証
+    PR_REVIEW --> CI_COMPLETION: 最新差分をAPPROVE
+    CI_COMPLETION --> TDD_IMPLEMENTATION: CI失敗・原因修正と再検証
+    CI_COMPLETION --> [*]: 最新HEADのレビュー承認・CI全成功
 ```
 
----
+修正後は既存PRのブランチに追加コミットをプッシュし、同じPRを再レビューします。PRを重複作成しません。
 
-### Stage 1: PLANNING（実装仕様検討・計画策定）
+### Stage 1: SPEC_PLANNING（仕様検討・実装計画）
 
-- **目的**: 仕様・設計・影響範囲を分析し、コードを書く前に堅牢な実装計画を策定する。
-- **ワークスペース**: 読み取り中心（コード変更・コミットは行わない）。
-- **実施手順**:
-  1. **Source of Truth の確認**:
-     - `prompt/PLAN.md` で現在のフェーズ・タスク進捗を確認。
-     - `prompt/SPEC.md` で機能仕様・制約条件を確認。
-     - 既存の関連コード・テスト・Proto定義を読み、設計パターンや契約を理解。
-  2. **設計・方針の検討**:
-     - アーキテクチャ・インターフェース設計（RESPコマンド、gRPC Proto、クラス責務）。
-     - 影響範囲（GarnetServer, AISidecar, テスト, ベンチマーク, 設定）の特定。
-     - テスト戦略の策定（Red先行の失敗テスト、Unit / Integration / E2E）。
-     - セキュリティ・安全性検討（シークレット漏洩防止、mTLS、入力境界バリデーション）。
-  3. **実装計画の作成**:
-     - 計画メモや `.ai/plans/<task-name>.md` に計画を言語化（背景、設計方針、変更対象ファイル、テスト手順、段階的タスクリスト）。
-     - 設計判断に迷う点や仕様の矛盾があれば、推測で進めずユーザーに確認する。
-- **ゲート**: 実装計画が具体化され、Stage 2（PLAN_REVIEW）へ提示可能な状態になっていること。
-
----
-
-### Stage 2: PLAN_REVIEW（実装仕様レビュー）
-
-- **目的**: 実装前に独立した客観的視点で計画を精査し、手戻り・破壊的変更・設計欠陥を排除する（**自己レビュー禁止**）。
-- **ワークスペース**: 読み取り専用。
-- **サブエージェントの必須利用**:
-  - メインエージェント自身で承認判断を行わず、**必ず独立したサブエージェント（`invoke_subagent`）を起動してレビューを委譲**する。
-  - サブエージェント設定例: `Role: 'Plan Reviewer'`, `TypeName: 'research'` または `'self'`
-  - サブエージェントに渡すプロンプトに以下を含める:
-    - 実装計画書（またはメモ）の内容
-    - 参照すべき仕様（`prompt/SPEC.md`, `prompt/PLAN.md`）
-    - レビュー観点と判定フォーマット
-- **レビュー観点**:
-  - **仕様適合性**: `prompt/SPEC.md` の要件・不変条件を満たしているか？
-  - **後方互換性と契約**: 既存のRESPコマンド仕様、gRPC Proto後方互換性、mTLS設定に破壊的変更はないか？
-  - **セキュリティ**: シークレットの露出リスク、未検証入力の混入、権限昇格リスクはないか？
-  - **テスタビリティ**: Redとなるテストケースが十分に検討されているか？
-  - **スコープ適正**: 余計な変更や過剰なリファクタリングが含まれていないか？
-- **判定フォーマット**:
-  - レビュアーサブエージェントは厳格な判定を出力する:
-    ```markdown
-    ## Plan Review Result
-    - **Verdict**: APPROVE | REQUEST_CHANGES
-    - **Summary**: <要約>
-    - **Findings**:
-      - <指摘点1>
-      - <指摘点2>
-    ```
-  - `APPROVE`: Stage 3（IMPLEMENTATION）へ進む。
-  - `REQUEST_CHANGES`: 指摘事項を整理して Stage 1（PLANNING）へ戻し、計画を改定（最大リビジョン数: 3回、超過時は `NEEDS_HUMAN` として人間に相談）。
-
----
-
-### Stage 3: IMPLEMENTATION（TDD実装）
-
-- **目的**: 承認された実装計画に沿って、TDD（テスト駆動開発）サイクルで高品質なコードを実装する。
-- **ワークスペース**: 読み書き（作業ブランチ上）。
-- **実施手順**:
-  1. **作業ブランチの作成**:
-     - `main` から `feature/<トピック>` 形式で作成（既存作業ブランチがある場合はそれを継続）。
-     ```bash
-     git checkout -b feature/<トピック>
-     ```
-  2. **TDDサイクル（Red → Green → Refactor）**:
-     - **Red**: 受け入れ条件を検証する失敗するテストを先に追加する。
-     - **Green**: テストをパスさせる最小限の実装を行う。
-     - **Refactor**: 設計、可読性、重複排除を改善する（テストがGreenのまま保たれることを確認）。
-  3. **Proto/コード生成の同期**:
-     - `src/Protos/` を変更した場合は `python codegen.py` でPython側コードを再生成する。
-- **ゲート**: 新規・修正したテストがローカルでパスしていること。
-
----
-
-### Stage 4: VERIFYING（検証・ローカル品質ゲート）
-
-- **目的**: リポジトリ全体の品質ゲート（静的解析・全テスト・フォーマット）を機械的に完走させる。
-- **実施コマンド**:
+- `AGENTS.md`、`prompt/PLAN.md`、`prompt/SPEC.md`、関連コード・テスト・Proto・CI定義を確認する。
+- 文書を含む変更を始める前に作業ツリーとベースブランチを確認し、専用ブランチを作成する。既存の当該タスク用ブランチがあれば継続し、ユーザーの未コミット変更は保全する。
   ```bash
-  # 1. C# フォーマット自動修正
-  dotnet format Pyrope.sln
-
-  # 2. 全体品質チェック（C#ビルド・テスト、Python lint・テスト、フォーマット検証）
-  ./scripts/check_quality.sh
+  git status --short --branch
+  git switch -c feature/<トピック>
   ```
-- **ゲート**: `./scripts/check_quality.sh` がエラーなし（Exit code 0）で100%成功すること。
-- **自己修正ループ**:
-  - 失敗した場合は、エラーログを分析し、ユーザーにエスカレーションする前に**自己修正**を試みる（Stage 3へ戻る）。
+  新規ブランチは合意したベース（通常 `main`）から作成する。文書更新は `docs/<トピック>` など目的に合う名前でもよい。
+- 目的、対象範囲、対象外、受け入れ条件、異常系・境界値、既存仕様との互換性を言語化する。
+- RESP / HTTP / gRPCの契約、テナント分離、認証、入力検証、mTLS、性能・運用への影響を検討する。
+- 変更対象、依存関係、段階的な実装手順、Redにするテスト、Unit / Integration / E2Eの検証方法を計画する。
+- 計画は会話内またはプロジェクト既存の文書構成に記録する。仕様変更が必要なら、実装前に `prompt/SPEC.md` の変更案もレビュー対象に含める。
+- `prompt/PLAN.md` に該当タスクがある場合は着手状況を更新する。ワークフロー文書だけの変更で、製品ロードマップに無関係なタスクを追加しない。
+- 安全に解決できる事項は根拠を示して判断し、要件の矛盾などユーザーの決定が必要な事項だけ確認する。
 
----
+**ゲート**: 仕様・受け入れ条件と実装・テスト計画が、第三者によってレビューできる状態になっていること。
 
-### Stage 5: PR_REVIEW（差分レビュー・コード検証）
+### Stage 2: SPEC_REVIEW（サブエージェントによる仕様レビュー・改善）
 
-- **目的**: マージ対象ブランチ（`origin/main`）に対する差分全体（Diff）を独立した観点で厳格にレビューする（**自己レビュー禁止**）。
-- **ワークスペース**: 読み取り専用。
-- **サブエージェントの必須利用**:
-  - 実装を行ったメインエージェント自身で差分を自己承認せず、**必ず独立したサブエージェント（`invoke_subagent`）を起動してコードレビューを委譲**する。
-  - サブエージェント設定例: `Role: 'Code Reviewer'`, `TypeName: 'research'` または `'self'`
-  - サブエージェントに渡すプロンプトに以下を含める:
-    - 差分確認コマンド: `git diff origin/main...HEAD`
-    - 承認された実装計画（Stage 1/2）
-    - レビュー観点と判定フォーマット
-- **レビュー観点**:
-  - **計画との整合**: Stage 1〜2で承認された計画通りに実装されているか？
-  - **コード品質**: 命名規則（C# `PascalCase`, Python `snake_case`）、可読性、不要なデバッグログ・コメントアウトの残存がないか？
-  - **ドキュメント整合**: `prompt/PLAN.md` の進捗状況や `prompt/SPEC.md`、`README.md` との整合性が保たれているか？
-  - **不純物の混入防止**: バイナリ、一時ファイル、`coverage/` ディレクトリ、環境依存ファイルが含まれていないか？
-  - **セキュリティ**: APIキーやシークレットのハードコード、不安全な入力処理がないか？
-- **判定フォーマット**:
-  - レビュアーサブエージェントは厳格な判定を出力する:
-    ```markdown
-    ## PR Review Result
-    - **Verdict**: APPROVE | REQUEST_CHANGES
-    - **Summary**: <レビュー要約>
-    - **Findings**:
-      - <指摘点1>
-      - <指摘点2>
-    ```
-  - `APPROVE`: Stage 6（COMPLETION）へ進む。
-  - `REQUEST_CHANGES`: Stage 6（REVISING）へ進み、指摘事項の修正を行う。
+- **執筆したメインエージェント自身で承認せず、独立したサブエージェントに必ずレビューを依頼する。**
+- 実行環境で利用可能なサブエージェント起動ツールを使う。特定環境専用のAPI名や引数を前提にしない。
+- レビュアーには計画全文・改訂番号、ユーザー要求、参照仕様、関連コード・テスト、レビュー観点を渡す。レビュアーは読み取り専用で評価する。
+- 仕様の抜け・矛盾、受け入れ条件の明確さ、後方互換性、セキュリティ、実現可能性、テスト可能性、変更範囲の妥当性を確認させる。
 
----
-
-### Stage 6: REVISING & PR_COMPLETION（リビジョン & PR作成・完了ゲート）
-
-- **目的**: レビュー指摘事項の修正、ドキュメントの最終更新、PR作成、CIステータスの確認。
-- **実施手順**:
-  - **REVISING（修正が必要な場合）**:
-    1. レビュー指摘事項を修正する。
-    2. Stage 4（VERIFYING: `./scripts/check_quality.sh`）を再実行してパスすることを確認する。
-    3. Stage 5（PR_REVIEW）で再レビューを受ける（最大サイクル数: 3回、超過時は人間に相談）。
-  - **PR_COMPLETION（承認された場合）**:
-    1. **`prompt/PLAN.md` の更新**:
-       - 完了したタスクのチェックボックスを更新（`[ ]` → `[x]`）。
-       - `Current:` や `Tests:` セクションに今回の成果・テスト結果の要約を記載。
-    2. **コミット & プッシュ**:
-       - Conventional Commits プレフィックス（`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `perf:`, `chore:`）を使用。
-       ```bash
-       git status --short
-       git add <対象ファイル>
-       git commit -m "<type>: <簡潔な説明>"
-       git push -u origin feature/<トピック>
-       ```
-    3. **Pull Request 作成**:
-       ```bash
-       gh pr create --title "<タスク名>" --body "<変更内容、テスト結果、レビュー確認事項>"
-       ```
-    4. **CIステータスの確認**:
-       ```bash
-       gh pr checks       # PRのCI結果を確認
-       gh run list        # ワークフロー実行一覧
-       gh run view <run-id> --log   # 失敗時のログ詳細
-       ```
-- **ゲート**: PRが作成され、GitHub Actions CIがすべてGreenでパスすること。
-
----
-
-## AI Agent Guidelines（AIアシスタント向け運用規則）
-
-コード変更や開発を行う際は、以下のルールを厳格に遵守してください。
-
-### 役割分担とサブエージェントの必須活用（客観性の担保）
-- **自己レビューの完全禁止**: レビュー段階（Stage 2: PLAN_REVIEW, Stage 5: PR_REVIEW）では、計画やコードを執筆したメインエージェント自身で承認判定を行わず、**必ず独立したサブエージェント（`invoke_subagent`）を起動して客観的なレビュー（`APPROVE` / `REQUEST_CHANGES`）を実施**すること。
-- **推測の排除**: 仕様に曖昧さがある場合や既存契約に反する疑いがある場合は、推測で進めず立ち止まって確認・エスカレーションする。
-
-### コンテキスト同期
-1. **PLAN.md を常に更新**: タスク着手時と完了時に必ず更新し、リポジトリの状態と整合させる。
-2. **SPEC.md を遵守**: 仕様変更が必要な場合はコード修正前にドキュメントの更新提案を行う。
-
-### 自己修正ループと上限管理
-- テストやLint、ビルドが失敗した場合は、エラーログから根本原因を特定し自律的に修正する。
-- 無限ループを防ぐため、計画リビジョンおよびPR修正サイクルはそれぞれ最大3回とし、解決しない場合は理由と再現手順を整理してユーザーに報告する。
-
----
-
-## よく使うコマンド
-
-### ビルド & 品質チェック
-```bash
-# 全体品質チェック（推奨: C#フォーマット、ビルド、テスト、Python lint・テスト）
-dotnet format Pyrope.sln
-./scripts/check_quality.sh
-
-# C# テストのみ
-dotnet test Pyrope.sln
-
-# 個別C#プロジェクトのテスト
-dotnet test tests/Pyrope.GarnetServer.Tests/Pyrope.GarnetServer.Tests.csproj
-
-# Python サイドカーテスト
-python3 -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"
+```markdown
+## Specification Review Result
+- Target: <計画の改訂番号>
+- Verdict: APPROVE | REQUEST_CHANGES
+- Summary: <要約>
+- Findings: <重要度・根拠・改善案。指摘なしの場合は「なし」>
 ```
 
-### Git & GitHub
-```bash
-# ブランチ作成
-git checkout -b feature/<トピック>
+**改善ループ**: `REQUEST_CHANGES` → 指摘ごとの対応を整理 → Stage 1で仕様・計画を改訂 → サブエージェントに再レビューを依頼。**改訂後の計画が `APPROVE` になるまで実装へ進まない。**
 
-# 差分確認（PR_REVIEW用）
-git diff origin/main...HEAD
+### Stage 3: TDD_IMPLEMENTATION（TDD実装・ローカル検証）
 
-# PRの作成
-gh pr create --title "<タスク名>" --body "<概要とテスト結果>"
+1. Stage 1で用意した専用ブランチ上で作業していることと、承認済みの仕様・計画を確認する。
+2. **Red**: 受け入れ条件や不具合を再現するテストを先に追加し、期待した理由で失敗することを確認する。
+3. **Green**: テストを成功させる最小限の実装を行う。
+4. **Refactor**: 可読性・責務分離・重複を改善し、テスト成功を維持する。
+5. 必要なUnit / Integration / E2Eを実行し、80%以上のカバレッジ要件を確認する。テストを弱めて成功扱いにしない。
+6. Protoを変更した場合は次のコマンドで同期する。生成したgRPCスタブはコミットしない。
+   ```bash
+   (cd src/Pyrope.AISidecar && python3 codegen.py)
+   ```
+7. 関連ドキュメントと `prompt/PLAN.md` の該当進捗を実態に合わせ、ローカル品質チェックを実行する。
+   ```bash
+   ./scripts/check_quality.sh
+   python3 -m unittest discover -s src/Pyrope.AISidecar/tests -p "test_*.py"
+   ```
+   フォーマット修正が必要な場合は対象範囲を確認して `dotnet format Pyrope.sln` を実行し、再検証する。
+   `check_quality.sh` のPython lintは非ブロッキングで、Pythonテストは含まれないため、終了コード0だけで全検証成功と見なさない。CI定義に合わせたlint・formatチェックと、変更に必要なsmoke testも実行する。
 
-# CI状況確認
-gh pr checks
-gh run list
-gh run view <run-id> --log
+文書のみで実行時の振る舞いが変わらない変更では、形式的なテスト追加は不要。差分・参照先・手順・状態遷移の整合性を検証し、TDDやカバレッジの非該当理由を記録する。リポジトリで必須の品質チェックは実行する。
+
+**ゲート**: 承認仕様を満たし、必要な検証が成功していること。失敗したら原因を修正し、該当するRed → Greenと品質検証を繰り返す。仕様・設計を変える修正はStage 1〜2へ戻す。
+
+### Stage 4: PR_CREATION（コミット・プッシュ・PR作成）
+
+**Stage 5のPRレビューより先に、レビュー対象となる実際のPRを作成する。**
+
+1. 差分全体を確認し、シークレット、一時ファイル、生成物、無関係な変更が混入していないことを確認する。
+2. 対象ファイルを明示してコミットし、作業ブランチをプッシュする。
+   ```bash
+   git diff --check
+   git diff
+   git status --short
+   git add <対象ファイル>
+   git commit -m "<type>: <変更内容>"
+   git push -u origin <作業ブランチ>
+   ```
+3. PR本文を一時ファイルに作成し、背景・変更内容・受け入れ条件・検証結果・仕様レビュー結果・設定変更を記載する。未実施の検証は明示する。
+   ```bash
+   gh pr create --base main --head <作業ブランチ> --title "<タスク名>" --body-file <PR本文ファイル>
+   ```
+   既存PRがある場合はそのPRを更新する。ベースブランチは実際のマージ先に合わせる。
+
+**ゲート**: リモートにコミットが反映され、PR URL・ベースブランチ・HEAD SHAが特定できること。この時点では完了を報告しない。
+
+### Stage 5: PR_REVIEW（サブエージェントによるPRレビュー・改善）
+
+- 実装者とは独立したサブエージェントに、**作成済みPRの最新差分全体**のレビューを必ず依頼する。
+- PR URL、ベースブランチ、最新HEAD SHA、承認済み仕様・計画、検証結果、前回指摘と対応を渡す。
+- リモート参照を更新し、実際のPRベースに対する差分を確認させる。以下はベースが `main` の場合の例。
+  ```bash
+  git fetch origin
+  git diff origin/main...HEAD
+  ```
+- レビュアーは読み取り専用で、仕様適合性、バグ・回帰、セキュリティ、テストの有効性、可読性、ドキュメント整合、不要な生成物の混入を確認する。
+
+```markdown
+## PR Review Result
+- Target: <PR URL・レビューしたHEAD SHA>
+- Verdict: APPROVE | REQUEST_CHANGES
+- Summary: <要約>
+- Findings: <重要度・ファイル位置・根拠・改善案。指摘なしの場合は「なし」>
 ```
 
-### Docker & 環境
-```bash
-docker-compose up -d      # 開発・mTLS環境起動
-docker-compose down       # 停止
-docker-compose logs -f    # ログ確認
-```
+**改善ループ**:
 
----
+1. `REQUEST_CHANGES` の指摘を整理し、Stage 3で必要な回帰テストと修正を行う。仕様変更があればStage 1〜2もやり直す。
+2. ローカル検証を再実行し、修正をコミットして**同じPRにプッシュ**する。
+3. 指摘への対応内容と検証結果をサブエージェントに渡し、更新後の差分全体を再レビューさせる。
+4. **最新HEADで `APPROVE` を得るまで繰り返す。** 過去コミットへの承認を新しい差分へ流用しない。
 
-## トラブルシューティング
+**ゲート**: 最新HEADの差分がサブエージェントに承認され、未解決の必須修正指摘がないこと。
 
-### レビュー差し戻し（REQUEST_CHANGES）が続く場合
-1. 指摘事項の根本原因（仕様理解不足、考慮漏れの境界条件、アーキテクチャの不整合）を整理する。
-2. 3回以上のリビジョンループが発生した場合は、自己判断を繰り返さず人間に相談（NEEDS_HUMAN）する。
+### Stage 6: CI_COMPLETION（CIオールグリーンまで対応）
 
-### CI / 品質チェック失敗時
-1. `gh run view <run-id> --log` または `./scripts/check_quality.sh` で失敗ログを確認。
-2. 失敗箇所（ビルド、フォーマット、C#テスト、Python lint/テスト）を特定。
-3. 最小限の修正でテストを通し、既存機能への影響がないか再検証。
+1. PRの最新HEADとチェック一覧を取得し、すべての対象CIの完了を監視する。短い間隔で状況を確認し、待機中も進捗を伝える。
+   ```bash
+   gh pr view <PR番号> --json url,headRefOid,statusCheckRollup
+   gh pr checks <PR番号>
+   gh run view <run-id> --log-failed
+   ```
+2. 失敗したらログを読み、コード・テスト・依存関係・環境・ワークフローのどこに原因があるか特定する。
+3. Stage 3で必要なテスト・修正・ローカル検証を行い、Stage 4でコミット・再プッシュし、Stage 5で最新HEADの再レビューを受ける。その後CIを再確認する。
+4. 一過性の実行基盤障害は根拠を確認して該当runを再実行する。原因不明のまま再実行を繰り返さない。
+5. **PRの最新HEADに紐づく対象CIがすべて成功するまで対応を継続する。** 古いSHAの成功、pending / queued / in_progress、failure / cancelled / timed_out / action_requiredを成功扱いにしない。
+6. `skipped` / `neutral` やチェック未生成を無条件にGreenと見なさない。CI定義・実行条件を確認し、対象チェックの欠落があれば解消する。仕様上非該当のチェックは理由を記録する。
+7. 最後にリモートHEADとレビュー対象SHAが一致し、対象CI全成功・作業ツリーの状態を確認する。PR URL、最終SHA、変更概要、レビュー結果、検証・CI結果を報告する。
 
-### ビルドエラー時
-1. エラーメッセージから依存関係・Proto生成・コード記述のいずれに起因するかを切り分け。
-2. `dotnet restore` または `pip install -r src/Pyrope.AISidecar/requirements.txt` を試す。
-3. Proto定義変更時は `src/Pyrope.AISidecar/codegen.py` を実行して同期。
+CIとレビューはPR作成後に並行して実行してよいが、**両方が同じ最新HEADで完了すること**を最終ゲートとする。Greenにするためのテスト削除・無効化、チェックの迂回、必須条件の緩和は行わない。マージは別途依頼がある場合のみ行う。
 
----
+## ループ継続とブロッカーの扱い
 
-## チェックリスト（完了ゲート）
+- 仕様レビュー、PRレビュー、CI修正は、指摘解消・承認・成功まで繰り返す。単に3回修正したという理由で未完了のまま終了しない。
+- 同じ問題が3回続いたら原因・方針・検証方法を見直す。解決可能なら改善して継続する。
+- 権限不足、認証不能、外部サービス障害、ユーザー判断が必要な仕様矛盾など、エージェントだけで解消できない場合は、ブロックされた工程、根拠、試した対処、必要な操作、再開条件を報告する。完了とは扱わない。
+- サブエージェントを起動できない場合に自己承認で代替しない。利用できない機能と未実施のレビューを明示する。
+- 変更・レビュー・検証の証跡は会話やPR本文に残す。シークレットを含むログは掲載しない。
 
-PR作成前に、全ステージの要件を満たしているか確認してください。
+## 完了チェックリスト
 
-- [ ] **Stage 1 (PLANNING)**: `PLAN.md` / `SPEC.md` を確認し、設計方針とテスト計画を立てた
-- [ ] **Stage 2 (PLAN_REVIEW)**: 独立したサブエージェント（`invoke_subagent`）によるレビューを受け、設計の互換性・安全性・テスタビリティで `APPROVE` を得た
-- [ ] **Stage 3 (IMPLEMENTATION)**: `feature/<トピック>` ブランチ上で TDD（Red → Green → Refactor）に従って実装した
-- [ ] **Stage 4 (VERIFYING)**: `dotnet format` を実行し、`./scripts/check_quality.sh` が100%パスした
-- [ ] **Stage 5 (PR_REVIEW)**: 独立したサブエージェント（`invoke_subagent`）による差分レビューを受け、不要なコードや不純物がないこと・品質要件で `APPROVE` を得た
-- [ ] **Stage 6 (COMPLETION)**: `prompt/PLAN.md` を更新し、適切なコミットメッセージでプッシュ、PRを作成した
-- [ ] **CI Verification**: GitHub Actions CIの checks がすべて Green になった
+PR作成時点ではなく、最終報告前に確認してください。
+
+- [ ] **Stage 1**: 仕様・受け入れ条件・実装計画・テスト戦略を明確にした
+- [ ] **Stage 2**: サブエージェントの仕様レビューと改善ループを経て、最新計画の `APPROVE` を得た
+- [ ] **Stage 3**: 専用ブランチ上でTDDと必要な品質検証を実施し、非該当・未実施は理由を記録した
+- [ ] **Stage 4**: 対象変更をコミット・プッシュし、PRを作成した
+- [ ] **Stage 5**: サブエージェントのPRレビューと改善ループを経て、最新HEADの `APPROVE` を得た
+- [ ] **Stage 6**: 同じ最新HEADの対象CIがすべて成功し、未解決の指摘がない
+- [ ] **最終報告**: PR URL・最終SHA・レビュー結果・検証結果・CI結果を報告した
